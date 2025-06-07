@@ -27,7 +27,7 @@ export const useCreateProject = () => {
 			const response = await api.post<Project>('/projects', projectData);
 
 			if (response.error) {
-				throw new Error(response.error);
+				throw response;
 			}
 
 			return response.data;
@@ -46,7 +46,7 @@ export const useUpdateProject = () => {
 			const response = await api.put<Project>(`/projects/${projectId}`, projectData);
 
 			if (response.error) {
-				throw new Error(response.error);
+				throw response;
 			}
 
 			return response.data;

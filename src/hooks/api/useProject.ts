@@ -51,20 +51,23 @@ export const useUpdateOpenApi = () => {
 	return useMutation({
 		mutationFn: async ({
 			projectId,
-			openApiSpec,
-			projectUpdatedAt,
+			specData,
+			lastKnownProjectUpdatedAt,
 		}: {
 			projectId: string;
-			openApiSpec: OpenAPISpec;
-			projectUpdatedAt: string;
+			specData: OpenAPISpec;
+			lastKnownProjectUpdatedAt?: string;
 		}) => {
-			const response = await api.put(`/projects/${projectId}/openapi`, {
-				openApiSpec,
-				projectUpdatedAt,
-			});
+			const payload: any = { specData };
+
+			if (lastKnownProjectUpdatedAt) {
+				payload.lastKnownProjectUpdatedAt = lastKnownProjectUpdatedAt;
+			}
+
+			const response = await api.put(`/projects/${projectId}/openapi`, payload);
 
 			if (response.error) {
-				throw new Error(response.error);
+				throw response;
 			}
 
 			return response.data;

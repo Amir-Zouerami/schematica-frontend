@@ -2,6 +2,7 @@ import { api } from '@/utils/api';
 import { useToast } from '@/hooks/use-toast';
 import EditorLoading from './EditorLoading';
 import { Button } from '@/components/ui/button';
+import { useUpdateOpenApi } from '@/hooks/api/useProject';
 import { OpenAPISpec, Project } from '@/types/types';
 import { Maximize, Minimize, RefreshCcw, X } from 'lucide-react';
 import React, { useState, useEffect, lazy, Suspense, useRef } from 'react';
@@ -29,8 +30,10 @@ interface OpenApiEditorProps {
 
 const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, projectUpdatedAt, isOpen, onClose }) => {
 	const { toast } = useToast();
+	const updateOpenApiMutation = useUpdateOpenApi();
+	const isSubmitting = updateOpenApiMutation.isPending;
+
 	const [openApiString, setOpenApiString] = useState('');
-	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [isFullscreen, setIsFullscreen] = useState(false);
 	const [jsonError, setJsonError] = useState<string | null>(null);
 
@@ -47,7 +50,6 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 			setJsonError(null);
 			setConflictError(null);
 			setServerConflictTimestamp(undefined);
-			setIsSubmitting(false);
 			initialOpenStateRef.current = true;
 		} else if (!isOpen) {
 			initialOpenStateRef.current = false;
@@ -97,30 +99,26 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 		const parsedOpenApi = validateOpenApiJsonOnSave(openApiString);
 		if (!parsedOpenApi) return;
 
-		setIsSubmitting(true);
 		if (!forceOverwrite) {
 			setConflictError(null);
 			setServerConflictTimestamp(undefined);
 		}
 
-		const payload: any = { specData: parsedOpenApi };
+		const mutationPayload: {
+			projectId: string;
+			specData: OpenAPISpec;
+			lastKnownProjectUpdatedAt?: string;
+		} = {
+			projectId,
+			specData: parsedOpenApi,
+		};
+
 		if (!forceOverwrite && lastKnownProjectUpdatedAt) {
-			payload.lastKnownProjectUpdatedAt = lastKnownProjectUpdatedAt;
+			mutationPayload.lastKnownProjectUpdatedAt = lastKnownProjectUpdatedAt;
 		}
 
 		try {
-			const response = await api.put<{ data: OpenAPISpec; projectUpdatedAt: string }>(`/projects/${projectId}/openapi`, payload);
-
-			if (response.error) {
-				if (response.status === 409) {
-					setServerConflictTimestamp(response.errorData?.serverUpdatedAt);
-					setConflictError(response.error || 'The OpenAPI specification has been modified by someone else since you started editing.');
-					setIsSubmitting(false);
-					return;
-				}
-
-				throw new Error(response.error);
-			}
+			await updateOpenApiMutation.mutateAsync(mutationPayload);
 
 			toast({
 				title: forceOverwrite ? 'OpenAPI Overwritten' : 'OpenAPI Updated',
@@ -128,18 +126,18 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 			});
 
 			onClose();
-		} catch (error) {
-			if (!conflictError || (error as any)?.status !== 409) {
-				toast({
-					title: 'Update Failed',
-					description: error instanceof Error ? error.message : 'Failed to update OpenAPI specification',
-					variant: 'destructive',
-				});
+		} catch (error: any) {
+			if (error?.status === 409) {
+				setServerConflictTimestamp(error.errorData?.serverUpdatedAt);
+				setConflictError(error.error || 'The OpenAPI specification has been modified by someone else since you started editing.');
+				return;
 			}
 
-			if (!(error instanceof Error && (error as any).isConflictError === true)) {
-				setIsSubmitting(false);
-			}
+			toast({
+				title: 'Update Failed',
+				description: error?.error || (error instanceof Error ? error.message : 'Failed to update OpenAPI specification'),
+				variant: 'destructive',
+			});
 		}
 	};
 
@@ -149,7 +147,6 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 
 	const handleCloseConflictDialogOnly = () => {
 		setConflictError(null);
-		setIsSubmitting(false);
 		toast({
 			title: 'Conflict Noted',
 			description: 'Your edits are still in the editor. Please review or copy them before proceeding.',
@@ -159,7 +156,7 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 
 	const handleRefreshAndDiscardEdits = async () => {
 		if (!projectId) return;
-		setIsSubmitting(true);
+		(updateOpenApiMutation.isPending as any) = true;
 		setConflictError(null);
 
 		try {
@@ -188,7 +185,7 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 		} catch (error) {
 			toast({ title: 'Refresh Failed', description: (error as Error).message, variant: 'destructive' });
 		} finally {
-			setIsSubmitting(false);
+			(updateOpenApiMutation.isPending as any) = false;
 		}
 	};
 
@@ -215,11 +212,12 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 				</div>
 
 				<div className="flex justify-end items-center mt-4 space-x-2">
-					<Button variant="outline" onClick={() => setIsFullscreen(false)} disabled={isSubmitting && !conflictError}>
+					<Button variant="outline" onClick={() => setIsFullscreen(false)} disabled={isSubmitting}>
 						Exit Fullscreen
 					</Button>
+
 					<Button onClick={() => handleSave(false)} disabled={isSubmitting || !!conflictError}>
-						{isSubmitting && !conflictError ? 'Saving...' : 'Save Changes'}
+						{isSubmitting ? 'Saving...' : 'Save Changes'}
 					</Button>
 				</div>
 			</div>
@@ -231,7 +229,7 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 			<Dialog
 				open={isOpen}
 				onOpenChange={openState => {
-					if (!openState && !(isSubmitting && !!conflictError)) {
+					if (!openState && !isSubmitting) {
 						onClose();
 					}
 				}}
@@ -239,6 +237,7 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 				<DialogContent className="max-h-[90vh] max-w-[90vw] lg:max-w-4xl xl:max-w-5xl 2xl:max-w-7xl w-full flex flex-col p-0 glass-card">
 					<DialogHeader className="p-6 pb-4 border-b">
 						<div className="flex justify-between items-center">
+
 							<DialogTitle className="text-2xl font-bold text-gradient">Edit OpenAPI Specification</DialogTitle>
 							<Button variant="ghost" size="icon" onClick={toggleFullscreen} title="Enter Fullscreen">
 								<Maximize className="h-5 w-5" />
@@ -261,12 +260,12 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 					</div>
 
 					<DialogFooter className="p-6 pt-4 border-t flex justify-end space-x-2">
-						<Button variant="outline" onClick={onClose} disabled={isSubmitting && !!conflictError}>
+						<Button variant="outline" onClick={onClose} disabled={isSubmitting}>
 							Cancel
 						</Button>
 
 						<Button onClick={() => handleSave(false)} disabled={isSubmitting || !!conflictError}>
-							{isSubmitting && !conflictError ? 'Saving...' : 'Save Changes'}
+							{isSubmitting ? 'Saving...' : 'Save Changes'}
 						</Button>
 					</DialogFooter>
 				</DialogContent>
@@ -278,13 +277,13 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 					onOpenChange={openDialog => {
 						if (!openDialog) {
 							setConflictError(null);
-							setIsSubmitting(false);
 						}
 					}}
 				>
 					<AlertDialogContent className="max-w-screen-lg w-[900px] overflow-y-auto max-h-screen">
 						<AlertDialogHeader>
 							<AlertDialogTitle>Concurrency Conflict</AlertDialogTitle>
+
 							<AlertDialogDescription>
 								<p className="mb-1">{conflictError}</p>
 								<div className="my-5 leading-relaxed">
@@ -294,7 +293,8 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 												<strong>Last server update EN:</strong> {new Date(serverConflictTimestamp).toLocaleString()}
 											</p>
 											<p>
-												<strong>Last server update FA:</strong> {new Date(serverConflictTimestamp).toLocaleString('fa-IR')}
+												<strong>Last server update FA:</strong>{' '}
+												{new Date(serverConflictTimestamp).toLocaleString('fa-IR')}
 											</p>
 										</>
 									)}
@@ -304,13 +304,30 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 						</AlertDialogHeader>
 
 						<AlertDialogFooter className="flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2 mt-2">
-							<Button className="w-full sm:w-auto" variant="outline" onClick={handleCloseConflictDialogOnly} disabled={isSubmitting}>
+							<Button
+								className="w-full sm:w-auto"
+								variant="outline"
+								onClick={handleCloseConflictDialogOnly}
+								disabled={isSubmitting}
+							>
 								<X className="mr-2 h-4 w-4" /> Review My Edits
 							</Button>
-							<Button className="w-full sm:w-auto" variant="secondary" onClick={handleRefreshAndDiscardEdits} disabled={isSubmitting}>
+
+							<Button
+								className="w-full sm:w-auto"
+								variant="secondary"
+								onClick={handleRefreshAndDiscardEdits}
+								disabled={isSubmitting}
+							>
 								<RefreshCcw className="mr-2 h-4 w-4" /> Refresh & Discard My Edits
 							</Button>
-							<Button className="w-full sm:w-auto" variant="destructive" onClick={handleForceSubmitFromDialog} disabled={isSubmitting}>
+
+							<Button
+								className="w-full sm:w-auto"
+								variant="destructive"
+								onClick={handleForceSubmitFromDialog}
+								disabled={isSubmitting}
+							>
 								Force Overwrite With My Edits
 							</Button>
 						</AlertDialogFooter>
