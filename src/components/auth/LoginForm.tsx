@@ -38,7 +38,7 @@ const LoginForm = () => {
 	return (
 		<Card className="w-full max-w-md mx-auto glass-card">
 			<CardHeader>
-				<CardTitle className="text-gradient text-2xl font-bold">{import.meta.env.VITE_BRAND_NAME}</CardTitle>
+				<CardTitle className="text-gradient text-2xl font-bold">{import.meta.env.VITE_BRAND_NAME} API Docs</CardTitle>
 				<CardDescription>Enter your credentials to access the platform</CardDescription>
 			</CardHeader>
 			<CardContent>

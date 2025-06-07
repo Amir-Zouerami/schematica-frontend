@@ -16,7 +16,7 @@ export default defineConfig(() => ({
 	},
 	assetsInclude: ['**/*.wasm'],
 	build: {
-		outDir: '../backend/public',
+		outDir: '../schematica-backend/public',
 		target: 'es2022',
 		rollupOptions: {
 			output: {
