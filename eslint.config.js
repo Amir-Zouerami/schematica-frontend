@@ -1,11 +1,12 @@
 import js from '@eslint/js';
 import globals from 'globals';
+import tseslint from 'typescript-eslint';
+import stylistic from '@stylistic/eslint-plugin';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
-import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-	{ ignores: ['dist'] },
+	{ ignores: ['dist', 'src/components/ui/**'] },
 	{
 		extends: [js.configs.recommended, ...tseslint.configs.recommended],
 		files: ['**/*.{ts,tsx}'],
@@ -14,6 +15,7 @@ export default tseslint.config(
 			globals: globals.browser,
 		},
 		plugins: {
+			'@stylistic': stylistic,
 			'react-hooks': reactHooks,
 			'react-refresh': reactRefresh,
 		},
@@ -22,6 +24,8 @@ export default tseslint.config(
 			'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
 			'@typescript-eslint/no-unused-vars': 'off',
 			'@typescript-eslint/no-explicit-any': 'off',
+			'@stylistic/brace-style': ['error', 'stroustrup', { allowSingleLine: false }],
+			'@stylistic/indent': ['error', 'tab', { SwitchCase: 1, MemberExpression: 0 }],
 		},
 	},
 );
