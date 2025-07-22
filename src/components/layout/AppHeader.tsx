@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Key, LogOut } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { Key, LogOut, Shield } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import ChangePasswordModal from '@/components/auth/ChangePasswordModal';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -41,6 +41,7 @@ const AppHeader = () => {
 												<AvatarImage src={user.profileImage} alt={user.username} />
 												<AvatarFallback>{user.username.substring(0, 2).toUpperCase()}</AvatarFallback>
 											</Avatar>
+
 											<div className="text-sm hidden sm:block">
 												<p className="font-medium">{user.username}</p>
 												<p className="text-xs text-muted-foreground capitalize">{user.role}</p>
@@ -54,12 +55,23 @@ const AppHeader = () => {
 												<AvatarImage src={user.profileImage} alt={user.username} />
 												<AvatarFallback>{user.username.substring(0, 2).toUpperCase()}</AvatarFallback>
 											</Avatar>
-											<div className="flex flex-col space-y-1 leading-none">
+
+											<div className="flex flex-col space-y-2 leading-none">
 												<p className="font-medium">{user.username}</p>
-												<p className="text-xs text-muted-foreground capitalize">Team: {user.role}</p>
+												<p className="text-xs text-muted-foreground capitalize">Team: {user.teams.join(', ')}</p>
 											</div>
 										</div>
+
 										<DropdownMenuSeparator />
+
+										{user.role === 'admin' && (
+											<DropdownMenuItem asChild>
+												<Link to="/admin">
+													<Shield className="mr-2 h-4 w-4" />
+													Admin Panel
+												</Link>
+											</DropdownMenuItem>
+										)}
 
 										<DropdownMenuItem onClick={() => setIsChangePasswordOpen(true)}>
 											<Key className="mr-2 h-4 w-4" />

@@ -20,10 +20,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 		logout: () => {},
 		changePassword: async () => {},
 	});
+
 	const { toast } = useToast();
 
 	const performLogout = useCallback(() => {
 		localStorage.removeItem('token');
+
 		setAuthState(prev => ({
 			...prev,
 			user: null,
@@ -59,27 +61,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 					setAuthState(prev => ({
 						...prev,
-						user: {
-							...data.user,
-							accessList: data.user.accessList || {
-								read: false,
-								write: false,
-								update: false,
-								delete: false,
-							},
-						} as User,
+						user: data.user as User,
 						isAuthenticated: true,
 						isLoading: false,
 					}));
-				} else if (response.status === 401 || response.status === 403) {
+				}
+				else if (response.status === 401 || response.status === 403) {
 					performLogout();
-				} else {
+				}
+				else {
 					setAuthState(prev => ({
 						...prev,
 						isLoading: false,
 					}));
 				}
-			} catch (error) {
+			}
+			catch (error) {
 				setAuthState(prev => ({
 					...prev,
 					isLoading: false,
@@ -104,33 +101,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 			if (response.ok) {
 				localStorage.setItem('token', data.token);
+
 				setAuthState(prev => ({
 					...prev,
-					user: {
-						...data.user,
-						accessList: data.user.accessList || {
-							read: false,
-							write: false,
-							update: false,
-							delete: false,
-						},
-					} as User,
+					user: data.user as User,
 					isAuthenticated: true,
 					isLoading: false,
 				}));
+
 				toast({
 					title: 'Login successful',
 					description: `Welcome back, ${data.user.username}!`,
+					duration: 2000,
 				});
-			} else {
+			}
+			else {
 				toast({
 					title: 'Login failed',
 					description: data.message || 'Invalid credentials',
 					variant: 'destructive',
 				});
+
 				throw new Error(data.message || 'Login failed');
 			}
-		} catch (error) {
+		}
+		catch (error) {
 			setAuthState(prev => ({ ...prev, isLoading: false }));
 			throw error;
 		}
@@ -139,9 +134,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 	const changePassword = async (currentPassword: string, newPassword: string) => {
 		try {
 			const token = localStorage.getItem('token');
+
 			if (!token) {
 				throw new Error('No token found. Please log in again.');
 			}
+
 			const response = await fetch(`/api/auth/change-password`, {
 				method: 'POST',
 				headers: {
@@ -162,16 +159,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 				throw new Error(data.message || 'Password change failed');
 			}
-		} catch (error) {
+		}
+		catch (error) {
 			if ((error as Error).message.includes('No token found')) {
 				performLogout();
 			}
+
 			throw error;
 		}
 	};
 
 	const logout = () => {
 		performLogout();
+
 		toast({
 			title: 'Logged out',
 			description: 'You have been successfully logged out',

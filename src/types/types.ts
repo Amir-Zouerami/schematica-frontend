@@ -277,12 +277,21 @@ export interface EndpointFormProps {
 		operation: OperationObject;
 	};
 	onClose: () => void;
-	onSubmit: (data: {
-		path: string;
-		method: string;
-		operation: OperationObject;
-		_lastKnownOperationUpdatedAt?: string;
-	}) => void;
+	onSubmit: (data: { path: string; method: string; operation: OperationObject; _lastKnownOperationUpdatedAt?: string }) => void;
+}
+
+export interface AccessControlList {
+	owners: {
+		users: string[];
+		teams: string[];
+	};
+	allow: {
+		users: string[];
+		teams: string[];
+	};
+	deny: {
+		users: string[];
+	};
 }
 
 export interface User {
@@ -290,14 +299,9 @@ export interface User {
 	username: string;
 	email?: string;
 	profileImage?: string;
-	role: 'frontend' | 'backend' | 'admin';
+	role: 'admin' | 'member';
 	createdAt?: string;
-	accessList: {
-		read: boolean;
-		write: boolean;
-		update: boolean;
-		delete: boolean;
-	};
+	teams?: string[];
 }
 
 export interface AuthState {
@@ -311,6 +315,7 @@ export interface Project {
 	name: string;
 	description?: string;
 	serverUrl?: string;
+	access?: AccessControlList;
 	createdBy: string;
 	createdAt: string;
 	updatedAt: string;
