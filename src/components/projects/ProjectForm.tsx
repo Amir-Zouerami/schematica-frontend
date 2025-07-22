@@ -12,12 +12,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 
 import {
 	AlertDialog,
-	AlertDialogContent,
-	AlertDialogDescription,
+	AlertDialogTitle,
 	AlertDialogFooter,
 	AlertDialogHeader,
-	AlertDialogTitle,
 	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
 } from '@/components/ui/alert-dialog';
 
 interface ProjectLink {
@@ -81,7 +81,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 				setConflictError(null);
 				setServerVersionTimestamp(undefined);
 			}
-		} else {
+		}
+		else {
 			if (!conflictError) {
 				hasInitializedFromProps.current = false;
 				currentProjectIdentifier.current = null;
@@ -134,7 +135,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 		try {
 			if (project) {
 				await updateProjectMutation.mutateAsync({ projectId: project.id, projectData: payload });
-			} else {
+			}
+			else {
 				await createProjectMutation.mutateAsync(payload);
 			}
 
@@ -146,7 +148,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 			});
 
 			onClose();
-		} catch (error: any) {
+		}
+		catch (error: any) {
 			if (error?.status === 409 && project) {
 				setServerVersionTimestamp(error.errorData?.serverUpdatedAt);
 				setConflictError(error.error || 'This project was updated by someone else. Please review.');
@@ -187,16 +190,19 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 					title: 'Data Refreshed',
 					description: 'Form has been updated with the latest server data. Your previous edits were discarded.',
 				});
-			} else {
+			}
+			else {
 				toast({
 					title: 'Refresh Failed',
 					description: response.error || 'Could not fetch latest project data.',
 					variant: 'destructive',
 				});
 			}
-		} catch (error) {
+		}
+		catch (error) {
 			toast({ title: 'Refresh Failed', description: (error as Error).message, variant: 'destructive' });
-		} finally {
+		}
+		finally {
 			tempSubmittingStateSetter(false);
 		}
 	};
@@ -222,7 +228,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 					}
 				}}
 			>
-				<DialogContent className="sm:max-w-[600px] glass-card">
+				<DialogContent className="max-w-3xl glass-card">
 					<DialogHeader>
 						<DialogTitle className="text-gradient">{project ? 'Edit Project' : 'Create New Project'}</DialogTitle>
 						<DialogDescription>

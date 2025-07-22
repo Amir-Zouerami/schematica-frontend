@@ -1,6 +1,7 @@
 import { useToast } from '@/hooks/use-toast';
 import React, { useState, useMemo } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useProject } from '@/hooks/api/useProject';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useUpdateEndpoint } from '@/hooks/api/useEndpoints';
 import { isRefObject, resolveRef, deeplyResolveReferences, formatDate } from '@/utils/schemaUtils';
 import { OperationObject, OpenAPISpec, ParameterObject, ReferenceObject, RequestBodyObject } from '@/types/types';
@@ -33,8 +34,9 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({
 	projectId,
 	endpointId,
 }) => {
-	const { user } = useAuth();
+	const { isProjectOwner } = usePermissions();
 	const { toast } = useToast();
+	const { data: project } = useProject(projectId);
 	const [isEditMode, setIsEditMode] = useState(false);
 	const updateEndpointMutation = useUpdateEndpoint();
 
@@ -46,7 +48,9 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({
 		const op = isRefObject(initialOperationOrRef) ? resolveRef(initialOperationOrRef.$ref, openApiSpec) : initialOperationOrRef;
 
 		if (!op || isRefObject(op)) {
-			return { summary: `Error: Unresolved op ${isRefObject(initialOperationOrRef) ? initialOperationOrRef.$ref : ''}` } as OperationObject;
+			return {
+				summary: `Error: Unresolved op ${isRefObject(initialOperationOrRef) ? initialOperationOrRef.$ref : ''}`,
+			} as OperationObject;
 		}
 
 		return deeplyResolveReferences<OperationObject>(op as OperationObject, openApiSpec);
@@ -99,7 +103,8 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({
 
 			toast({ title: 'Endpoint updated', description: 'The endpoint has been updated successfully' });
 			setIsEditMode(false);
-		} catch (error: any) {
+		}
+		catch (error: any) {
 			if (error && typeof error.error === 'string' && error.status !== undefined) {
 				if (error.status !== 409) {
 					toast({
@@ -108,7 +113,8 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({
 						variant: 'destructive',
 					});
 				}
-			} else {
+			}
+			else {
 				toast({
 					title: 'Client Error',
 					description: (error as Error).message || 'An unexpected client-side error occurred.',
@@ -119,7 +125,7 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({
 		}
 	};
 
-	if (isEditMode && user?.accessList?.update) {
+	if (isEditMode && isProjectOwner(project)) {
 		return (
 			<Dialog
 				open={isEditMode}
@@ -155,10 +161,7 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({
 				<div className="flex flex-col justify-center items-start space-y-2 sm:space-y-3 flex-shrink-0">
 					<div className="flex items-center space-x-2 text-sm text-muted-foreground">
 						<Avatar className="h-6 w-6">
-							<AvatarImage
-								src={createdBy !== 'Unknown' ? `/profile-pictures/${createdBy}.png` : undefined}
-								alt={createdBy}
-							/>
+							<AvatarImage src={createdBy !== 'Unknown' ? `/profile-pictures/${createdBy}.png` : undefined} alt={createdBy} />
 							<AvatarFallback>{createdBy.substring(0, 2).toUpperCase()}</AvatarFallback>
 						</Avatar>
 
@@ -170,10 +173,7 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({
 					{lastEditedBy && lastEditedAt && (
 						<div className="flex items-center space-x-2 text-sm text-muted-foreground">
 							<Avatar className="h-6 w-6">
-								<AvatarImage
-									src={lastEditedBy ? `/profile-pictures/${lastEditedBy}.png` : undefined}
-									alt={lastEditedBy}
-								/>
+								<AvatarImage src={lastEditedBy ? `/profile-pictures/${lastEditedBy}.png` : undefined} alt={lastEditedBy} />
 								<AvatarFallback>{lastEditedBy.substring(0, 2).toUpperCase()}</AvatarFallback>
 							</Avatar>
 
@@ -183,12 +183,12 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({
 						</div>
 					)}
 
-					{user?.accessList?.update && (
-						<Button 
-							variant="outline" 
-							size="sm" 
-							onClick={() => setIsEditMode(true)} 
-							className="mt-2 w-full" 
+					{isProjectOwner(project) && (
+						<Button
+							variant="outline"
+							size="sm"
+							onClick={() => setIsEditMode(true)}
+							className="mt-2 w-full"
 							disabled={updateEndpointMutation.isPending}
 						>
 							Edit Endpoint
@@ -229,12 +229,7 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({
 					</TabsContent>
 
 					<TabsContent value="notes">
-						<NotesSection
-							projectId={projectId}
-							path={initialPath}
-							method={initialMethod}
-							operation={operation}
-						/>
+						<NotesSection projectId={projectId} path={initialPath} method={initialMethod} operation={operation} />
 					</TabsContent>
 				</Tabs>
 			</div>

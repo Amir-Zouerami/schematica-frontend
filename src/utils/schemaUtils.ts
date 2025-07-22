@@ -15,7 +15,8 @@ export const resolveRef = (ref: string, openApiSpec: OpenAPISpec): any | null =>
 	for (const segment of path) {
 		if (current && typeof current === 'object' && segment in current) {
 			current = current[segment];
-		} else {
+		}
+		else {
 			return null;
 		}
 	}
@@ -74,11 +75,13 @@ export const resolveRequestBody = (
 
 		if (resolved && !isRefObject(resolved)) {
 			directRequestBody = resolved as RequestBodyObject;
-		} else {
+		}
+		else {
 			console.warn(`Could not resolve RequestBody $ref: ${requestBodyOrRef.$ref}`);
 			return null;
 		}
-	} else {
+	}
+	else {
 		directRequestBody = requestBodyOrRef;
 	}
 
@@ -120,15 +123,18 @@ export const getTypeString = (schema: SchemaObject | ReferenceObject, openApiSpe
 
 	if (resolvedSchema.enum) {
 		typeString = `${resolvedSchema.type || 'string'} (enum)`;
-	} else if (typeString === 'array' && resolvedSchema.items) {
+	}
+	else if (typeString === 'array' && resolvedSchema.items) {
 		const itemSchema = resolvedSchema.items;
 
 		if (isRefObject(itemSchema)) {
 			const refParts = itemSchema.$ref.split('/');
 			typeString = `array[${refParts[refParts.length - 1] || 'reference'}]`;
-		} else if (itemSchema && typeof itemSchema === 'object' && 'type' in itemSchema) {
+		}
+		else if (itemSchema && typeof itemSchema === 'object' && 'type' in itemSchema) {
 			typeString = `array[${(itemSchema as SchemaObject).type || 'unknown_item'}]`;
-		} else {
+		}
+		else {
 			typeString = `array[unknown_item_format]`;
 		}
 	}
@@ -145,7 +151,8 @@ export const getResolvedSchemaJson = (schema: SchemaObject | ReferenceObject, op
 		}
 
 		return JSON.stringify(fullyResolvedSchema, null, 2);
-	} catch (error) {
+	}
+	catch (error) {
 		console.error('Failed to fully resolve schema (exception):', error);
 		return JSON.stringify(schema, null, 2);
 	}
@@ -167,7 +174,8 @@ export const formatDate = (dateString?: string): string => {
 			hour: '2-digit',
 			minute: '2-digit',
 		});
-	} catch (e) {
+	}
+	catch (e) {
 		return 'Invalid date';
 	}
 };

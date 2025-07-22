@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
+import { usePermissions } from '@/hooks/usePermissions';
 import ProjectForm from '@/components/projects/ProjectForm';
 import ProjectCard from '@/components/projects/ProjectCard';
 import { useProjects, useDeleteProject } from '@/hooks/api/useProjects';
 
 const ProjectsPage = () => {
-	const { user } = useAuth();
+	const { canCreateProject } = usePermissions();
 	const { toast } = useToast();
 	const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
@@ -27,7 +27,8 @@ const ProjectsPage = () => {
 				title: 'Project Deleted',
 				description: 'The project has been deleted successfully',
 			});
-		} catch (error) {
+		}
+		catch (error) {
 			toast({
 				title: 'Error',
 				description: error instanceof Error ? error.message : 'Failed to delete project',
@@ -66,7 +67,7 @@ const ProjectsPage = () => {
 		<div className="space-y-6">
 			<div className="flex justify-between items-center">
 				<h1 className="text-3xl font-bold text-gradient">Projects</h1>
-				{user?.accessList?.write && (
+				{canCreateProject && (
 					<Button onClick={handleCreateProject}>
 						<Plus className="h-4 w-4 mr-2" /> Create Project
 					</Button>
@@ -76,7 +77,7 @@ const ProjectsPage = () => {
 			{projects.length === 0 ? (
 				<div className="text-center py-20">
 					<h2 className="text-2xl font-semibold text-muted-foreground mb-4">No projects yet</h2>
-					{user?.accessList?.write ? (
+					{canCreateProject ? (
 						<>
 							<p className="text-muted-foreground mb-6">Create your first project to get started</p>
 							<Button onClick={handleCreateProject}>

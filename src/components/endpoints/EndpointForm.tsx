@@ -105,7 +105,8 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({ projectId, initialEndpo
 
 		if (op?.parameters) {
 			setParameters((op.parameters as ParameterObject[]).map(p => ({ _id: uuidv4(), ...p })));
-		} else {
+		}
+		else {
 			setParameters([]);
 		}
 		const resolvedRb = op?.requestBody as RequestBodyObject | undefined;
@@ -125,7 +126,8 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({ projectId, initialEndpo
 
 					if (firstExampleObject && 'value' in firstExampleObject) exampleForForm = (firstExampleObject as ExampleObject).value;
 					else exampleForForm = firstExampleObject;
-				} else if (mediaType.example !== undefined) exampleForForm = mediaType.example;
+				}
+				else if (mediaType.example !== undefined) exampleForForm = mediaType.example;
 			}
 			setRequestBodyState({
 				description: resolvedRb.description || '',
@@ -135,7 +137,8 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({ projectId, initialEndpo
 				exampleString: JSON.stringify(exampleForForm, null, 2),
 				exampleName: exampleNameForForm,
 			});
-		} else {
+		}
+		else {
 			setRequestBodyState(undefined);
 		}
 
@@ -159,7 +162,8 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({ projectId, initialEndpo
 							if (firstExampleObject && 'value' in firstExampleObject)
 								exampleForForm = (firstExampleObject as ExampleObject).value;
 							else exampleForForm = firstExampleObject;
-						} else if (appJsonContent.example !== undefined) exampleForForm = appJsonContent.example;
+						}
+						else if (appJsonContent.example !== undefined) exampleForForm = appJsonContent.example;
 					}
 
 					return {
@@ -168,17 +172,18 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({ projectId, initialEndpo
 						description: respData.description,
 						content: respData.content
 							? {
-									'application/json': {
-										schemaString: JSON.stringify(appJsonContent?.schema || {}, null, 2),
-										exampleString: JSON.stringify(exampleForForm, null, 2),
-										exampleName: exampleNameForForm,
-									},
-							  }
+								'application/json': {
+									schemaString: JSON.stringify(appJsonContent?.schema || {}, null, 2),
+									exampleString: JSON.stringify(exampleForForm, null, 2),
+									exampleName: exampleNameForForm,
+								},
+							}
 							: undefined,
 					};
 				}),
 			);
-		} else {
+		}
+		else {
 			setManagedResponses([
 				{
 					_id: uuidv4(),
@@ -204,7 +209,8 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({ projectId, initialEndpo
 			hasInitializedFromProps.current = true;
 			setConflictDetails(null);
 			setIsSubmittingForm(false);
-		} else if (
+		}
+		else if (
 			initialEndpoint &&
 			currentInitialEndpointId.current === newEndpointIdentifier &&
 			!hasInitializedFromProps.current &&
@@ -259,7 +265,8 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({ projectId, initialEndpo
 					const inferredSchema = inferSchemaFromValue(parsedExample);
 					newSchemaString = JSON.stringify(inferredSchema, null, 2);
 					currentExampleName = undefined;
-				} catch (e) {
+				}
+				catch (e) {
 					/* Keep old schema */
 				}
 
@@ -324,7 +331,8 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({ projectId, initialEndpo
 							const inferredSchema = inferSchemaFromValue(parsedExample);
 							newSchemaString = JSON.stringify(inferredSchema, null, 2);
 							newExampleName = undefined;
-						} catch (e) {
+						}
+						catch (e) {
 							/* Keep old schema */
 						}
 					}
@@ -398,7 +406,8 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({ projectId, initialEndpo
 
 				if (requestBodyState.exampleString.trim() && requestBodyState.exampleString.trim() !== '{}')
 					currentRbExampleData = JSON.parse(requestBodyState.exampleString);
-			} catch (err) {
+			}
+			catch (err) {
 				toast({ title: 'Error', description: 'Invalid JSON in Request Body.', variant: 'destructive' });
 				submissionError = true;
 			}
@@ -452,7 +461,8 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({ projectId, initialEndpo
 
 				if (appJsonContentStrings?.exampleString?.trim() && appJsonContentStrings.exampleString.trim() !== '{}')
 					currentRespExampleData = JSON.parse(appJsonContentStrings.exampleString);
-			} catch (err) {
+			}
+			catch (err) {
 				toast({ title: 'Error', description: `Invalid JSON in Response ${mr_ui.statusCode}.`, variant: 'destructive' });
 				submissionError = true;
 				return;
@@ -496,7 +506,8 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({ projectId, initialEndpo
 
 		if (metadataSource) {
 			appMetadata = { ...metadataSource, lastEditedBy: user?.username || 'unknown', lastEditedAt: new Date().toISOString() };
-		} else {
+		}
+		else {
 			appMetadata = {
 				createdBy: user?.username || 'unknown',
 				createdAt: new Date().toISOString(),
@@ -519,7 +530,8 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({ projectId, initialEndpo
 
 		try {
 			await onSubmit(payloadForParent);
-		} catch (error) {
+		}
+		catch (error) {
 			const apiResponseError = error as ApiResponse<any>;
 
 			if (apiResponseError && typeof apiResponseError.error === 'string' && apiResponseError.status === 409) {
@@ -583,12 +595,15 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({ projectId, initialEndpo
 					title: 'Data Refreshed',
 					description: 'Form has been updated with the latest server data. Your previous edits were discarded.',
 				});
-			} else {
+			}
+			else {
 				throw new Error('Could not resolve latest operation to get its timestamp or it was a ref.');
 			}
-		} catch (error) {
+		}
+		catch (error) {
 			toast({ title: 'Refresh Failed', description: (error as Error).message, variant: 'destructive' });
-		} finally {
+		}
+		finally {
 			setIsSubmittingForm(false);
 		}
 	};

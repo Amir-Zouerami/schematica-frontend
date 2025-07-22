@@ -49,7 +49,8 @@ const CurlConverter: React.FC<CurlConverterProps> = ({ projectId, openApiSpec })
 			});
 
 			setCurlCommand('');
-		} catch (error) {
+		}
+		catch (error) {
 			toast({
 				title: 'Conversion Error',
 				description: error instanceof Error ? error.message : 'Failed to convert CURL to OpenAPI',

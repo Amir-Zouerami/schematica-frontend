@@ -83,13 +83,15 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClo
 			navigate(redirectTo, { replace: true });
 
 			resetForm();
-		} catch (error: any) {
+		}
+		catch (error: any) {
 			toast({
 				title: 'Change Password Failed',
 				description: error?.message || 'An unexpected error occurred. Please try again.',
 				variant: 'destructive',
 			});
-		} finally {
+		}
+		finally {
 			setIsLoading(false);
 		}
 	};
@@ -103,7 +105,7 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClo
 				}
 			}}
 		>
-			<DialogContent className="sm:max-w-md">
+			<DialogContent className="sm:max-w-md max-w-4xl">
 				<DialogHeader>
 					<DialogTitle>Change Password</DialogTitle>
 					<DialogDescription>

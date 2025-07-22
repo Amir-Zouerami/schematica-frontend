@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDeleteProject } from '@/hooks/api/useProjects';
 import ProjectForm from '@/components/projects/ProjectForm';
@@ -10,7 +10,8 @@ import OpenApiEditor from '@/components/openapi/OpenApiEditor';
 import CurlConverter from '@/components/endpoints/CurlConverter';
 import EndpointsList from '@/components/endpoints/EndpointsList';
 import { useProject, useOpenApiSpec } from '@/hooks/api/useProject';
-import { SquareArrowOutUpRight, Download, Edit3, Trash2 } from 'lucide-react';
+import ProjectAccessForm from '@/components/projects/ProjectAccessForm';
+import { SquareArrowOutUpRight, Download, Edit3, Trash2, Users } from 'lucide-react';
 import { sanitizeOpenApiSpecForDownload, convertOpenApiToPostmanCollection, convertToYaml } from '@/utils/openApiUtils';
 
 import {
@@ -28,15 +29,16 @@ const ProjectDetailPage = () => {
 	const { projectId } = useParams<{ projectId: string }>();
 	const navigate = useNavigate();
 	const { toast } = useToast();
-	const { user } = useAuth();
+	const { isProjectOwner } = usePermissions();
 
 	const { data: project, isLoading: projectLoading, error: projectError } = useProject(projectId);
 	const { data: openApiSpec, isLoading: specLoading } = useOpenApiSpec(projectId);
 	const deleteProjectMutation = useDeleteProject();
 
+	const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
+	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 	const [isOpenApiEditorOpen, setIsOpenApiEditorOpen] = useState(false);
 	const [isEditProjectModalOpen, setIsEditProjectModalOpen] = useState(false);
-	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
 	const isLoading = projectLoading || specLoading;
 
@@ -48,10 +50,12 @@ const ProjectDetailPage = () => {
 			await deleteProjectMutation.mutateAsync(projectId!);
 			toast({ title: 'Project Deleted', description: 'The project has been deleted successfully' });
 			navigate('/');
-		} catch (err) {
+		}
+		catch (err) {
 			const errorMessage = err instanceof Error ? err.message : 'Failed to delete project';
 			toast({ title: 'Delete Failed', description: errorMessage, variant: 'destructive' });
-		} finally {
+		}
+		finally {
 			setIsDeleteDialogOpen(false);
 		}
 	};
@@ -77,7 +81,8 @@ const ProjectDetailPage = () => {
 		let specString;
 		try {
 			specString = JSON.stringify(sanitizedSpec, null, 2);
-		} catch (err) {
+		}
+		catch (err) {
 			toast({ title: 'Download Error', description: 'Could not prepare data for download.', variant: 'destructive' });
 			return;
 		}
@@ -97,7 +102,8 @@ const ProjectDetailPage = () => {
 
 		try {
 			specString = convertToYaml(sanitizedSpec);
-		} catch (err) {
+		}
+		catch (err) {
 			toast({ title: 'Download Error', description: 'Could not prepare YAML data for download.', variant: 'destructive' });
 			return;
 		}
@@ -111,19 +117,26 @@ const ProjectDetailPage = () => {
 		if (!openApiSpec || !project) {
 			return;
 		}
+
 		const postmanCollection = convertOpenApiToPostmanCollection(openApiSpec);
+
 		if (!postmanCollection) {
 			toast({ title: 'Conversion Failed', description: 'Could not convert to Postman collection.', variant: 'destructive' });
 			return;
 		}
+
 		let collectionString;
+
 		try {
 			collectionString = JSON.stringify(postmanCollection, null, 2);
-		} catch (err) {
+		}
+		catch (err) {
 			toast({ title: 'Download Error', description: 'Could not prepare Postman data.', variant: 'destructive' });
 			return;
 		}
+
 		const collectionNameForFile = (project?.name || 'api-collection').replace(/[^a-z0-9_.-]/gi, '_').toLowerCase();
+
 		downloadFileHelper(collectionString, `${collectionNameForFile}.postman_collection.json`, 'application/json');
 		toast({ title: 'Download Started', description: 'Postman collection is downloading.' });
 	};
@@ -135,8 +148,10 @@ const ProjectDetailPage = () => {
 					<Skeleton className="h-10 w-3/5" />
 					<Skeleton className="h-9 w-24" />
 				</div>
+
 				<Skeleton className="h-16 w-full" />
 				<Skeleton className="h-10 w-full" />
+
 				<div className="space-y-4 mt-8">
 					<Skeleton className="h-8 w-1/3" />
 					<Skeleton className="h-24 w-full" />
@@ -150,9 +165,11 @@ const ProjectDetailPage = () => {
 		return (
 			<div className="text-center py-10 px-4">
 				<h2 className="text-2xl font-bold text-red-500 mb-4">Error Loading Project</h2>
+
 				<p className="text-muted-foreground mb-6">
 					{projectError instanceof Error ? projectError.message : `Project with ID ${projectId} not found.`}
 				</p>
+
 				<Button onClick={() => navigate('/')}>Back to Projects</Button>
 			</div>
 		);
@@ -173,11 +190,16 @@ const ProjectDetailPage = () => {
 					)}
 				</div>
 				<div className="flex flex-col sm:flex-row md:flex-col gap-2 self-start md:self-center flex-shrink-0">
-					{user?.accessList?.update && (
+					{isProjectOwner(project) && (
 						<>
+							<Button variant="outline" className="w-full sm:w-auto md:w-full" onClick={() => setIsAccessModalOpen(true)}>
+								<Users className="h-4 w-4 mr-2" /> Manage Access
+							</Button>
+
 							<Button variant="outline" className="w-full sm:w-auto md:w-full" onClick={handleEditProject}>
 								<Edit3 className="h-4 w-4 mr-2" /> Edit Project
 							</Button>
+
 							<Button variant="destructive" className="w-full sm:w-auto md:w-full" onClick={handleDeleteProject}>
 								<Trash2 className="h-4 w-4 mr-2" /> Delete Project
 							</Button>
@@ -213,17 +235,21 @@ const ProjectDetailPage = () => {
 
 			<div className="flex flex-wrap justify-between items-center gap-4 !mt-12">
 				<h2 className="text-2xl font-bold text-gradient-green">API Documentation</h2>
+
 				<div className="flex flex-wrap gap-2">
 					<Button variant="outline" onClick={handleDownloadOpenApiSpecJson} disabled={!openApiSpec}>
 						<Download className="h-4 w-4 mr-2" /> OpenAPI (JSON)
 					</Button>
+
 					<Button variant="outline" onClick={handleDownloadOpenApiSpecYaml} disabled={!openApiSpec}>
 						<Download className="h-4 w-4 mr-2" /> OpenAPI (YAML)
 					</Button>
+
 					<Button variant="outline" onClick={handleDownloadPostmanCollection} disabled={!openApiSpec}>
 						<Download className="h-4 w-4 mr-2" /> Postman
 					</Button>
-					{user?.accessList?.update && (
+
+					{isProjectOwner(project) && (
 						<Button variant="outline" onClick={() => setIsOpenApiEditorOpen(true)} disabled={!openApiSpec}>
 							<Edit3 className="h-4 w-4 mr-2" /> Edit Open API
 						</Button>
@@ -232,7 +258,7 @@ const ProjectDetailPage = () => {
 			</div>
 
 			<div>
-				{user?.accessList?.write && openApiSpec && (
+				{isProjectOwner(project) && openApiSpec && (
 					<div className="space-y-6 mb-6">
 						<CurlConverter projectId={projectId || ''} openApiSpec={openApiSpec} />
 					</div>
@@ -248,6 +274,10 @@ const ProjectDetailPage = () => {
 				<ProjectForm open={isEditProjectModalOpen} onClose={() => setIsEditProjectModalOpen(false)} project={project} />
 			)}
 
+			{isAccessModalOpen && project && (
+				<ProjectAccessForm project={project} isOpen={isAccessModalOpen} onClose={() => setIsAccessModalOpen(false)} />
+			)}
+
 			{isOpenApiEditorOpen && openApiSpec && project && (
 				<OpenApiEditor
 					projectId={projectId || ''}
@@ -260,16 +290,19 @@ const ProjectDetailPage = () => {
 
 			{isDeleteDialogOpen && project && (
 				<AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-					<AlertDialogContent>
+					<AlertDialogContent className="max-w-3xl">
 						<AlertDialogHeader>
 							<AlertDialogTitle>Are you sure?</AlertDialogTitle>
-							<AlertDialogDescription>
+
+							<AlertDialogDescription className="py-1 leading-6">
 								This will permanently delete the project "{project.name}" and all of its endpoints. This action cannot be
 								undone.
 							</AlertDialogDescription>
 						</AlertDialogHeader>
+
 						<AlertDialogFooter>
 							<AlertDialogCancel disabled={deleteProjectMutation.isPending}>Cancel</AlertDialogCancel>
+
 							<AlertDialogAction
 								onClick={confirmDeleteProject}
 								disabled={deleteProjectMutation.isPending}

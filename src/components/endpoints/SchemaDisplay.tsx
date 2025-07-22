@@ -60,7 +60,8 @@ const SchemaDisplay: React.FC<SchemaDisplayProps> = ({
 			if (isRefObject(exOrRef)) {
 				const resolvedExampleObj = resolveRef(exOrRef.$ref, openApiSpec);
 				exampleValue = resolvedExampleObj?.value !== undefined ? resolvedExampleObj.value : resolvedExampleObj;
-			} else {
+			}
+			else {
 				exampleValue = exOrRef.value !== undefined ? exOrRef.value : exOrRef;
 			}
 
@@ -100,16 +101,16 @@ const SchemaDisplay: React.FC<SchemaDisplayProps> = ({
 					{showJson ||
 					isSchemaEffectivelyAReferenceOrError ||
 					(typeof schema === 'object' && Object.keys(schema).length === 0 && !isRefObject(schema) && schema.type !== 'object') ? (
-						<SimpleCodeBlock code={schemaJson} language="json" />
-					) : (
-						<SchemaViewer
-							schema={schema as SchemaObject}
-							openApiSpec={openApiSpec}
-							depth={0}
-							isNested={false}
-							showFullJsonButton={true}
-						/>
-					)}
+							<SimpleCodeBlock code={schemaJson} language="json" />
+						) : (
+							<SchemaViewer
+								schema={schema as SchemaObject}
+								openApiSpec={openApiSpec}
+								depth={0}
+								isNested={false}
+								showFullJsonButton={true}
+							/>
+						)}
 				</div>
 
 				{displayExample !== undefined && (

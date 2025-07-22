@@ -1,10 +1,12 @@
 import React from 'react';
 import NotFound from './pages/NotFound';
 import LoginPage from '@/pages/LoginPage';
+import AdminPage from './pages/AdminPage';
 import Layout from './components/layout/Layout';
 import ProjectsPage from './pages/ProjectsPage';
 import { Toaster } from '@/components/ui/toaster';
 import { AuthProvider } from './contexts/AuthContext';
+import AdminRoute from '@/components/auth/AdminRoute';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster as Sonner } from '@/components/ui/sonner';
@@ -30,6 +32,9 @@ const App = () => {
 									<Route element={<Layout />}>
 										<Route path="/" element={<ProjectsPage />} />
 										<Route path="/projects/:projectId" element={<ProjectDetailPage />} />
+										<Route element={<AdminRoute />}>
+											<Route path="/admin" element={<AdminPage />} />
+										</Route>
 									</Route>
 								</Route>
 								<Route path="*" element={<NotFound />} />

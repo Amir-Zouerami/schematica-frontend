@@ -51,7 +51,8 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 			setConflictError(null);
 			setServerConflictTimestamp(undefined);
 			initialOpenStateRef.current = true;
-		} else if (!isOpen) {
+		}
+		else if (!isOpen) {
 			initialOpenStateRef.current = false;
 		}
 	}, [isOpen, openApi, projectUpdatedAt, conflictError]);
@@ -89,7 +90,8 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 
 			setJsonError('Invalid OpenAPI structure: "openapi" version field is missing or format is incorrect.');
 			return null;
-		} catch (err) {
+		}
+		catch (err) {
 			setJsonError(`Invalid JSON: ${err instanceof Error ? err.message : 'Unknown error'}`);
 			return null;
 		}
@@ -126,7 +128,8 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 			});
 
 			onClose();
-		} catch (error: any) {
+		}
+		catch (error: any) {
 			if (error?.status === 409) {
 				setServerConflictTimestamp(error.errorData?.serverUpdatedAt);
 				setConflictError(error.error || 'The OpenAPI specification has been modified by someone else since you started editing.');
@@ -182,9 +185,11 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 				title: 'Editor Content Reloaded',
 				description: 'Latest version loaded into the editor. Your previous unsaved edits were discarded.',
 			});
-		} catch (error) {
+		}
+		catch (error) {
 			toast({ title: 'Refresh Failed', description: (error as Error).message, variant: 'destructive' });
-		} finally {
+		}
+		finally {
 			(updateOpenApiMutation.isPending as any) = false;
 		}
 	};

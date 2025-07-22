@@ -39,7 +39,8 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 				requestBody instanceof ReadableStream
 			) {
 				processedBody = requestBody as FetchBodyType;
-			} else if (typeof requestBody === 'object') {
+			}
+			else if (typeof requestBody === 'object') {
 				headers.append('Content-Type', 'application/json');
 				processedBody = JSON.stringify(requestBody);
 			}
@@ -58,9 +59,11 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 
 		if (contentType && contentType.includes('application/json')) {
 			responseDataJson = await fetchResponse.json();
-		} else if (fetchResponse.status === 204 || fetchResponse.status === 205) {
+		}
+		else if (fetchResponse.status === 204 || fetchResponse.status === 205) {
 			responseDataJson = null;
-		} else {
+		}
+		else {
 			responseDataJson = await fetchResponse.text();
 		}
 
@@ -74,16 +77,19 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 				typeof responseDataJson.message === 'string'
 			) {
 				errorMessage = responseDataJson.message;
-			} else if (
+			}
+			else if (
 				typeof responseDataJson === 'string' &&
 				responseDataJson.length > 0 &&
 				responseDataJson.length < 200 &&
 				!responseDataJson.trim().startsWith('<')
 			) {
 				errorMessage = responseDataJson;
-			} else if (fetchResponse.statusText) {
+			}
+			else if (fetchResponse.statusText) {
 				errorMessage = `${fetchResponse.status}: ${fetchResponse.statusText}`;
-			} else {
+			}
+			else {
 				errorMessage = `HTTP error ${fetchResponse.status}`;
 			}
 
@@ -95,7 +101,8 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 		}
 
 		return { data: responseDataJson as T, status: responseStatus };
-	} catch (error) {
+	}
+	catch (error) {
 		return {
 			error: 'Network error or server not responding',
 			status: responseStatus,
