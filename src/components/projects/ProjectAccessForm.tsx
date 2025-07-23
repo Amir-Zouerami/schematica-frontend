@@ -1,10 +1,10 @@
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { useTeams } from '@/hooks/api/useTeams';
+import { useUsers } from '@/hooks/api/useUsers';
 import React, { useState, useEffect } from 'react';
 import { useUpdateProject } from '@/hooks/api/useProjects';
 import { Project, AccessControlList } from '@/types/types';
-import { useUsers, SanitizedUser } from '@/hooks/api/useUsers';
 import { X, ChevronsUpDown, Users as TeamsIcon } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
@@ -57,8 +57,7 @@ const Selector = ({
 									onSelect={() => {
 										onSelect(item.id);
 										setOpen(false);
-									}}
-								>
+									}}>
 									{item.name}
 								</CommandItem>
 							))}
@@ -98,8 +97,7 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 
 			if (action === 'add' && !currentList.includes(value)) {
 				currentList.push(value);
-			}
-			else if (action === 'remove') {
+			} else if (action === 'remove') {
 				(newAccess[list] as any)[type] = currentList.filter(item => item !== value);
 			}
 			return newAccess;
@@ -120,8 +118,7 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 
 			toast({ title: 'Success', description: 'Project access updated successfully.' });
 			onClose();
-		}
-		catch (error: any) {
+		} catch (error: any) {
 			toast({
 				title: 'Error',
 				description: error.error || 'Failed to update project access.',
@@ -155,59 +152,63 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 						/>
 					</div>
 				</CardHeader>
-				<CardContent>
-					<Table>
-						<TableBody>
-							{userItems.length === 0 && teamItems.length === 0 && (
-								<TableRow>
-									<TableCell className="text-center text-muted-foreground">No entries.</TableCell>
-								</TableRow>
-							)}
-							{userItems.map(userId => {
-								const user = getUserById(userId);
-								return (
-									<TableRow key={`user-${userId}`}>
-										<TableCell className="flex items-center gap-2">
-											<Avatar className="h-6 w-6">
-												<AvatarImage src={user?.profileImage} />
-												<AvatarFallback>{user?.username.substring(0, 2).toUpperCase()}</AvatarFallback>
-											</Avatar>
-											<span>{user?.username || 'Unknown User'}</span>
-										</TableCell>
-										<TableCell className="text-right">
-											<Button
-												variant="ghost"
-												size="icon"
-												onClick={() => handleModify('remove', list, 'users', userId)}
-											>
-												<X className="h-4 w-4" />
-											</Button>
-										</TableCell>
-									</TableRow>
-								);
-							})}
-							{teamItems.map(teamId => {
-								const team = allTeams.find(t => t.id === teamId);
-								return (
-									<TableRow key={`team-${teamId}`}>
-										<TableCell className="flex items-center gap-2">
-											<TeamsIcon className="h-5 w-5 text-muted-foreground" />
-											<span>{team?.name || 'Unknown Team'}</span>
-										</TableCell>
-										<TableCell className="text-right">
-											<Button
-												variant="ghost"
-												size="icon"
-												onClick={() => handleModify('remove', list, 'teams', teamId)}
-											>
-												<X className="h-4 w-4" />
-											</Button>
-										</TableCell>
-									</TableRow>
-								);
-							})}
-						</TableBody>
-					</Table>
+				<CardContent className="p-0">
+					<div className="max-h-32 overflow-y-auto border-t">
+						{userItems.length === 0 && teamItems.length === 0 ? (
+							<div className="p-4 text-center text-muted-foreground text-sm">No entries.</div>
+						) : (
+							<Table>
+								<TableBody>
+									{userItems.map(userId => {
+										const user = getUserById(userId);
+										return (
+											<TableRow key={`user-${userId}`}>
+												<TableCell className="flex items-center gap-2 py-2">
+													<Avatar className="h-6 w-6">
+														<AvatarImage src={user?.profileImage} />
+														<AvatarFallback className="text-xs">
+															{user?.username.substring(0, 2).toUpperCase()}
+														</AvatarFallback>
+													</Avatar>
+													<span className="text-sm">{user?.username || 'Unknown User'}</span>
+												</TableCell>
+												<TableCell className="text-right py-2">
+													<Button
+														variant="ghost"
+														size="sm"
+														className="h-6 w-6 p-0"
+														onClick={() => handleModify('remove', list, 'users', userId)}>
+														<X className="h-3 w-3" />
+													</Button>
+												</TableCell>
+											</TableRow>
+										);
+									})}
+
+									{teamItems.map(teamId => {
+										const team = allTeams.find(t => t.id === teamId);
+										return (
+											<TableRow key={`team-${teamId}`}>
+												<TableCell className="flex items-center gap-2 py-2">
+													<TeamsIcon className="h-4 w-4 text-muted-foreground" />
+													<span className="text-sm">{team?.name || 'Unknown Team'}</span>
+												</TableCell>
+												<TableCell className="text-right py-2">
+													<Button
+														variant="ghost"
+														size="sm"
+														className="h-6 w-6 p-0"
+														onClick={() => handleModify('remove', list, 'teams', teamId)}>
+														<X className="h-3 w-3" />
+													</Button>
+												</TableCell>
+											</TableRow>
+										);
+									})}
+								</TableBody>
+							</Table>
+						)}
+					</div>
 				</CardContent>
 			</Card>
 		);
@@ -215,16 +216,15 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 
 	return (
 		<Dialog open={isOpen} onOpenChange={onClose}>
-			<DialogContent className="max-w-4xl">
-				<DialogHeader>
+			<DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+				<DialogHeader className="flex-shrink-0">
 					<DialogTitle>Manage Access for "{project.name}"</DialogTitle>
-
 					<DialogDescription>
 						Control who can see and manage this project. Changes are not saved until you click the save button.
 					</DialogDescription>
 				</DialogHeader>
 
-				<div className="space-y-6 py-4">
+				<div className="flex-1 overflow-y-auto space-y-4 py-4">
 					{renderAccessList('Project Owners', 'owners')}
 					{renderAccessList('General Access', 'allow')}
 
@@ -239,52 +239,50 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 							/>
 						</CardHeader>
 
-						<CardContent>
-							<Table>
-								<TableBody>
-									{access.deny.users.length > 0 ? (
-										access.deny.users.map(userId => {
-											const user = getUserById(userId);
-
-											return (
-												<TableRow key={`deny-${userId}`}>
-													<TableCell className="flex items-center gap-2">
-														<Avatar className="h-6 w-6">
-															<AvatarImage src={user?.profileImage} />
-															<AvatarFallback>{user?.username.substring(0, 2).toUpperCase()}</AvatarFallback>
-														</Avatar>
-
-														<span>{user?.username || 'Unknown User'}</span>
-													</TableCell>
-
-													<TableCell className="text-right">
-														<Button
-															variant="ghost"
-															size="icon"
-															onClick={() => handleModify('remove', 'deny', 'users', userId)}
-														>
-															<X className="h-4 w-4" />
-														</Button>
-													</TableCell>
-												</TableRow>
-											);
-										})
-									) : (
-										<TableRow>
-											<TableCell className="text-center text-muted-foreground">No entries.</TableCell>
-										</TableRow>
-									)}
-								</TableBody>
-							</Table>
+						<CardContent className="p-0">
+							<div className="max-h-32 overflow-y-auto border-t">
+								{access.deny.users.length > 0 ? (
+									<Table>
+										<TableBody>
+											{access.deny.users.map(userId => {
+												const user = getUserById(userId);
+												return (
+													<TableRow key={`deny-${userId}`}>
+														<TableCell className="flex items-center gap-2 py-2">
+															<Avatar className="h-6 w-6">
+																<AvatarImage src={user?.profileImage} />
+																<AvatarFallback className="text-xs">
+																	{user?.username.substring(0, 2).toUpperCase()}
+																</AvatarFallback>
+															</Avatar>
+															<span className="text-sm">{user?.username || 'Unknown User'}</span>
+														</TableCell>
+														<TableCell className="text-right py-2">
+															<Button
+																variant="ghost"
+																size="sm"
+																className="h-6 w-6 p-0"
+																onClick={() => handleModify('remove', 'deny', 'users', userId)}>
+																<X className="h-3 w-3" />
+															</Button>
+														</TableCell>
+													</TableRow>
+												);
+											})}
+										</TableBody>
+									</Table>
+								) : (
+									<div className="p-4 text-center text-muted-foreground text-sm">No entries.</div>
+								)}
+							</div>
 						</CardContent>
 					</Card>
 				</div>
 
-				<DialogFooter>
+				<DialogFooter className="flex-shrink-0">
 					<Button variant="outline" onClick={onClose}>
 						Cancel
 					</Button>
-
 					<Button onClick={handleSubmit} disabled={updateProjectMutation.isPending}>
 						{updateProjectMutation.isPending ? 'Saving...' : 'Save Changes'}
 					</Button>
