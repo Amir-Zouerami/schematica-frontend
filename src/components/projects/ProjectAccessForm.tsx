@@ -57,7 +57,8 @@ const Selector = ({
 									onSelect={() => {
 										onSelect(item.id);
 										setOpen(false);
-									}}>
+									}}
+								>
 									{item.name}
 								</CommandItem>
 							))}
@@ -97,9 +98,11 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 
 			if (action === 'add' && !currentList.includes(value)) {
 				currentList.push(value);
-			} else if (action === 'remove') {
+			}
+			else if (action === 'remove') {
 				(newAccess[list] as any)[type] = currentList.filter(item => item !== value);
 			}
+
 			return newAccess;
 		});
 	};
@@ -118,7 +121,8 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 
 			toast({ title: 'Success', description: 'Project access updated successfully.' });
 			onClose();
-		} catch (error: any) {
+		}
+		catch (error: any) {
 			toast({
 				title: 'Error',
 				description: error.error || 'Failed to update project access.',
@@ -177,7 +181,8 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 														variant="ghost"
 														size="sm"
 														className="h-6 w-6 p-0"
-														onClick={() => handleModify('remove', list, 'users', userId)}>
+														onClick={() => handleModify('remove', list, 'users', userId)}
+													>
 														<X className="h-3 w-3" />
 													</Button>
 												</TableCell>
@@ -198,7 +203,8 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 														variant="ghost"
 														size="sm"
 														className="h-6 w-6 p-0"
-														onClick={() => handleModify('remove', list, 'teams', teamId)}>
+														onClick={() => handleModify('remove', list, 'teams', teamId)}
+													>
 														<X className="h-3 w-3" />
 													</Button>
 												</TableCell>
@@ -262,7 +268,8 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 																variant="ghost"
 																size="sm"
 																className="h-6 w-6 p-0"
-																onClick={() => handleModify('remove', 'deny', 'users', userId)}>
+																onClick={() => handleModify('remove', 'deny', 'users', userId)}
+															>
 																<X className="h-3 w-3" />
 															</Button>
 														</TableCell>
