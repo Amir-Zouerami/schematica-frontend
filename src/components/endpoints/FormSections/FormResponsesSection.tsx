@@ -22,8 +22,16 @@ interface FormResponsesSectionProps {
 	managedResponses: ManagedResponseUI[];
 	onAddResponseClick: () => void;
 	onRemoveManagedResponse: (id: string) => void;
-	onUpdateManagedResponseValue: (id: string, field: 'statusCode' | 'description', value: string) => void;
-	onUpdateResponseContentString: (id: string, type: 'schemaString' | 'exampleString', value: string) => void;
+	onUpdateManagedResponseValue: (
+		id: string,
+		field: 'statusCode' | 'description',
+		value: string,
+	) => void;
+	onUpdateResponseContentString: (
+		id: string,
+		type: 'schemaString' | 'exampleString',
+		value: string,
+	) => void;
 	isSubmittingForm: boolean;
 }
 
@@ -40,26 +48,47 @@ const FormResponsesSection: React.FC<FormResponsesSectionProps> = ({
 			<div className="flex justify-between items-center">
 				<h3 className="text-md font-medium">Responses</h3>
 
-				<Button type="button" variant="outline" size="sm" onClick={onAddResponseClick} disabled={isSubmittingForm}>
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					onClick={onAddResponseClick}
+					disabled={isSubmittingForm}
+				>
 					<Plus className="h-4 w-4 mr-1" /> Add
 				</Button>
 			</div>
 
 			{managedResponses.length > 0 ? (
 				<div className="space-y-8">
-					{managedResponses.map(managedResp => (
-						<div key={managedResp._id} className="p-4 border border-border rounded-lg space-y-4">
+					{managedResponses.map((managedResp) => (
+						<div
+							key={managedResp._id}
+							className="p-4 border border-border rounded-lg space-y-4"
+						>
 							<div className="flex justify-between items-center">
 								<div className="flex items-center space-x-2">
 									<Input
 										value={managedResp.statusCode}
-										onChange={e => onUpdateManagedResponseValue(managedResp._id, 'statusCode', e.target.value)}
+										onChange={(e) =>
+											onUpdateManagedResponseValue(
+												managedResp._id,
+												'statusCode',
+												e.target.value,
+											)
+										}
 										className="w-24 font-mono"
 										disabled={isSubmittingForm}
 									/>
 									<Input
 										value={managedResp.description}
-										onChange={e => onUpdateManagedResponseValue(managedResp._id, 'description', e.target.value)}
+										onChange={(e) =>
+											onUpdateManagedResponseValue(
+												managedResp._id,
+												'description',
+												e.target.value,
+											)
+										}
 										className="max-w-md"
 										disabled={isSubmittingForm}
 									/>
@@ -78,8 +107,16 @@ const FormResponsesSection: React.FC<FormResponsesSectionProps> = ({
 
 							<Label>Schema (JSON)</Label>
 							<Textarea
-								value={managedResp.content?.['application/json']?.schemaString || ''}
-								onChange={e => onUpdateResponseContentString(managedResp._id, 'schemaString', e.target.value)}
+								value={
+									managedResp.content?.['application/json']?.schemaString || ''
+								}
+								onChange={(e) =>
+									onUpdateResponseContentString(
+										managedResp._id,
+										'schemaString',
+										e.target.value,
+									)
+								}
 								className="font-mono"
 								rows={6}
 								disabled={isSubmittingForm}
@@ -87,8 +124,16 @@ const FormResponsesSection: React.FC<FormResponsesSectionProps> = ({
 
 							<Label>Example (JSON)</Label>
 							<Textarea
-								value={managedResp.content?.['application/json']?.exampleString || ''}
-								onChange={e => onUpdateResponseContentString(managedResp._id, 'exampleString', e.target.value)}
+								value={
+									managedResp.content?.['application/json']?.exampleString || ''
+								}
+								onChange={(e) =>
+									onUpdateResponseContentString(
+										managedResp._id,
+										'exampleString',
+										e.target.value,
+									)
+								}
 								className="font-mono"
 								rows={6}
 								disabled={isSubmittingForm}

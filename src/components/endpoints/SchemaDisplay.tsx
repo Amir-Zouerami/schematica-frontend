@@ -35,7 +35,9 @@ const SchemaDisplay: React.FC<SchemaDisplayProps> = ({
 			return deeplyResolveReferences<any>(initialExample, openApiSpec);
 		}
 
-		const resolvedInitialSchema = isRefObject(initialSchema) ? resolveRef(initialSchema.$ref, openApiSpec) : initialSchema;
+		const resolvedInitialSchema = isRefObject(initialSchema)
+			? resolveRef(initialSchema.$ref, openApiSpec)
+			: initialSchema;
 
 		if (
 			resolvedInitialSchema &&
@@ -59,9 +61,11 @@ const SchemaDisplay: React.FC<SchemaDisplayProps> = ({
 
 			if (isRefObject(exOrRef)) {
 				const resolvedExampleObj = resolveRef(exOrRef.$ref, openApiSpec);
-				exampleValue = resolvedExampleObj?.value !== undefined ? resolvedExampleObj.value : resolvedExampleObj;
-			}
-			else {
+				exampleValue =
+					resolvedExampleObj?.value !== undefined
+						? resolvedExampleObj.value
+						: resolvedExampleObj;
+			} else {
 				exampleValue = exOrRef.value !== undefined ? exOrRef.value : exOrRef;
 			}
 
@@ -72,7 +76,12 @@ const SchemaDisplay: React.FC<SchemaDisplayProps> = ({
 	}, [initialExamples, openApiSpec]);
 
 	const schemaJson = useMemo(() => {
-		if (initialSchema && typeof initialSchema === 'object' && Object.keys(initialSchema).length === 0 && !isRefObject(initialSchema)) {
+		if (
+			initialSchema &&
+			typeof initialSchema === 'object' &&
+			Object.keys(initialSchema).length === 0 &&
+			!isRefObject(initialSchema)
+		) {
 			return JSON.stringify({}, null, 2);
 		}
 
@@ -86,7 +95,10 @@ const SchemaDisplay: React.FC<SchemaDisplayProps> = ({
 
 	const isSchemaEffectivelyAReferenceOrError =
 		isRefObject(initialSchema) &&
-		(isRefObject(schema) || (typeof schema === 'object' && schema !== null && ('error' in schema || 'circular' in schema)));
+		(isRefObject(schema) ||
+			(typeof schema === 'object' &&
+				schema !== null &&
+				('error' in schema || 'circular' in schema)));
 
 	return (
 		<Card className="mt-4 border border-border bg-muted/30 shadow-none">
@@ -100,17 +112,20 @@ const SchemaDisplay: React.FC<SchemaDisplayProps> = ({
 				<div className="border border-border/50 rounded p-3 bg-background">
 					{showJson ||
 					isSchemaEffectivelyAReferenceOrError ||
-					(typeof schema === 'object' && Object.keys(schema).length === 0 && !isRefObject(schema) && schema.type !== 'object') ? (
-							<SimpleCodeBlock code={schemaJson} language="json" />
-						) : (
-							<SchemaViewer
-								schema={schema as SchemaObject}
-								openApiSpec={openApiSpec}
-								depth={0}
-								isNested={false}
-								showFullJsonButton={true}
-							/>
-						)}
+					(typeof schema === 'object' &&
+						Object.keys(schema).length === 0 &&
+						!isRefObject(schema) &&
+						schema.type !== 'object') ? (
+						<SimpleCodeBlock code={schemaJson} language="json" />
+					) : (
+						<SchemaViewer
+							schema={schema as SchemaObject}
+							openApiSpec={openApiSpec}
+							depth={0}
+							isNested={false}
+							showFullJsonButton={true}
+						/>
+					)}
 				</div>
 
 				{displayExample !== undefined && (
@@ -121,13 +136,19 @@ const SchemaDisplay: React.FC<SchemaDisplayProps> = ({
 					>
 						<CollapsibleTrigger className="flex items-center justify-between w-full bg-muted/50 px-4 py-2 hover:bg-muted transition-colors text-sm font-medium">
 							Example
-							<ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isExampleOpen ? 'transform rotate-180' : ''}`} />
+							<ChevronDown
+								className={`h-4 w-4 transition-transform duration-200 ${isExampleOpen ? 'transform rotate-180' : ''}`}
+							/>
 						</CollapsibleTrigger>
 
 						<CollapsibleContent className="p-0">
 							<div className="bg-background">
 								<SimpleCodeBlock
-									code={typeof displayExample === 'string' ? displayExample : JSON.stringify(displayExample, null, 2)}
+									code={
+										typeof displayExample === 'string'
+											? displayExample
+											: JSON.stringify(displayExample, null, 2)
+									}
 									language={typeof displayExample === 'object' ? 'json' : 'text'}
 								/>
 							</div>
@@ -137,16 +158,25 @@ const SchemaDisplay: React.FC<SchemaDisplayProps> = ({
 
 				{resolvedExamples &&
 					Object.entries(resolvedExamples).map(([key, exValue], idx) => (
-						<Collapsible key={key} className="border border-border rounded-lg overflow-hidden mt-4">
+						<Collapsible
+							key={key}
+							className="border border-border rounded-lg overflow-hidden mt-4"
+						>
 							<CollapsibleTrigger className="flex items-center justify-between w-full bg-muted/50 px-4 py-2 hover:bg-muted transition-colors text-sm font-medium">
 								Example: {key}
-								<ChevronDown className={`h-4 w-4 transition-transform duration-200`} />
+								<ChevronDown
+									className={`h-4 w-4 transition-transform duration-200`}
+								/>
 							</CollapsibleTrigger>
 
 							<CollapsibleContent className="p-0">
 								<div className="bg-background">
 									<SimpleCodeBlock
-										code={typeof exValue === 'string' ? exValue : JSON.stringify(exValue, null, 2)}
+										code={
+											typeof exValue === 'string'
+												? exValue
+												: JSON.stringify(exValue, null, 2)
+										}
 										language={typeof exValue === 'object' ? 'json' : 'text'}
 									/>
 								</div>

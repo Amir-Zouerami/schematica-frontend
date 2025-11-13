@@ -20,7 +20,7 @@ const Layout = () => {
 				<main className="flex-grow container mx-auto px-4 py-8">
 					<Skeleton className="h-12 w-full mb-6" />
 					<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-						{[1, 2, 3, 4, 5, 6].map(i => (
+						{[1, 2, 3, 4, 5, 6].map((i) => (
 							<Skeleton key={i} className="h-48 w-full rounded-lg" />
 						))}
 					</div>

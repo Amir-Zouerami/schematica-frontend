@@ -2,7 +2,14 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { resolveRef } from '@/utils/schemaUtils';
 import { ParameterObject, OpenAPISpec, SchemaObject, ReferenceObject } from '@/types/types';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from '@/components/ui/table';
 
 interface ParametersTableProps {
 	parameters: ParameterObject[];
@@ -10,7 +17,11 @@ interface ParametersTableProps {
 	isEditable?: boolean;
 }
 
-const ParametersTable: React.FC<ParametersTableProps> = ({ parameters, openApiSpec, isEditable = false }) => {
+const ParametersTable: React.FC<ParametersTableProps> = ({
+	parameters,
+	openApiSpec,
+	isEditable = false,
+}) => {
 	const getTypeString = (schema?: SchemaObject | ReferenceObject): string => {
 		if (!schema) return 'unknown';
 
@@ -64,7 +75,11 @@ const ParametersTable: React.FC<ParametersTableProps> = ({ parameters, openApiSp
 						</TableCell>
 
 						<TableCell className="text-center">
-							{param.required ? <Badge variant="default">Yes</Badge> : <span className="text-muted-foreground">No</span>}
+							{param.required ? (
+								<Badge variant="default">Yes</Badge>
+							) : (
+								<span className="text-muted-foreground">No</span>
+							)}
 						</TableCell>
 					</TableRow>
 				))}

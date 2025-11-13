@@ -12,7 +12,11 @@ import EndpointsList from '@/components/endpoints/EndpointsList';
 import { useProject, useOpenApiSpec } from '@/hooks/api/useProject';
 import ProjectAccessForm from '@/components/projects/ProjectAccessForm';
 import { SquareArrowOutUpRight, Download, Edit3, Trash2, Users } from 'lucide-react';
-import { sanitizeOpenApiSpecForDownload, convertOpenApiToPostmanCollection, convertToYaml } from '@/utils/openApiUtils';
+import {
+	sanitizeOpenApiSpecForDownload,
+	convertOpenApiToPostmanCollection,
+	convertToYaml,
+} from '@/utils/openApiUtils';
 
 import {
 	AlertDialog,
@@ -48,14 +52,15 @@ const ProjectDetailPage = () => {
 	const confirmDeleteProject = async () => {
 		try {
 			await deleteProjectMutation.mutateAsync(projectId!);
-			toast({ title: 'Project Deleted', description: 'The project has been deleted successfully' });
+			toast({
+				title: 'Project Deleted',
+				description: 'The project has been deleted successfully',
+			});
 			navigate('/');
-		}
-		catch (err) {
+		} catch (err) {
 			const errorMessage = err instanceof Error ? err.message : 'Failed to delete project';
 			toast({ title: 'Delete Failed', description: errorMessage, variant: 'destructive' });
-		}
-		finally {
+		} finally {
 			setIsDeleteDialogOpen(false);
 		}
 	};
@@ -74,26 +79,39 @@ const ProjectDetailPage = () => {
 
 	const handleDownloadOpenApiSpecJson = () => {
 		if (!openApiSpec) {
-			toast({ title: 'Download Error', description: 'OpenAPI data is not loaded.', variant: 'destructive' });
+			toast({
+				title: 'Download Error',
+				description: 'OpenAPI data is not loaded.',
+				variant: 'destructive',
+			});
 			return;
 		}
 		const sanitizedSpec = sanitizeOpenApiSpecForDownload(openApiSpec);
 		let specString;
 		try {
 			specString = JSON.stringify(sanitizedSpec, null, 2);
-		}
-		catch (err) {
-			toast({ title: 'Download Error', description: 'Could not prepare data for download.', variant: 'destructive' });
+		} catch (err) {
+			toast({
+				title: 'Download Error',
+				description: 'Could not prepare data for download.',
+				variant: 'destructive',
+			});
 			return;
 		}
-		const projectNameForFile = project?.name ? project.name.replace(/\s+/g, '_').toLowerCase() : projectId;
+		const projectNameForFile = project?.name
+			? project.name.replace(/\s+/g, '_').toLowerCase()
+			: projectId;
 		downloadFileHelper(specString, `${projectNameForFile}.openapi.json`, 'application/json');
 		toast({ title: 'Download Started', description: 'Sanitized OpenAPI JSON is downloading.' });
 	};
 
 	const handleDownloadOpenApiSpecYaml = () => {
 		if (!openApiSpec) {
-			toast({ title: 'Download Error', description: 'OpenAPI data not loaded.', variant: 'destructive' });
+			toast({
+				title: 'Download Error',
+				description: 'OpenAPI data not loaded.',
+				variant: 'destructive',
+			});
 			return;
 		}
 
@@ -102,13 +120,18 @@ const ProjectDetailPage = () => {
 
 		try {
 			specString = convertToYaml(sanitizedSpec);
-		}
-		catch (err) {
-			toast({ title: 'Download Error', description: 'Could not prepare YAML data for download.', variant: 'destructive' });
+		} catch (err) {
+			toast({
+				title: 'Download Error',
+				description: 'Could not prepare YAML data for download.',
+				variant: 'destructive',
+			});
 			return;
 		}
 
-		const projectNameForFile = project?.name ? project.name.replace(/\s+/g, '_').toLowerCase() : projectId;
+		const projectNameForFile = project?.name
+			? project.name.replace(/\s+/g, '_').toLowerCase()
+			: projectId;
 		downloadFileHelper(specString, `${projectNameForFile}.openapi.yaml`, 'application/x-yaml');
 		toast({ title: 'Download Started', description: 'Sanitized OpenAPI YAML is downloading.' });
 	};
@@ -121,7 +144,11 @@ const ProjectDetailPage = () => {
 		const postmanCollection = convertOpenApiToPostmanCollection(openApiSpec);
 
 		if (!postmanCollection) {
-			toast({ title: 'Conversion Failed', description: 'Could not convert to Postman collection.', variant: 'destructive' });
+			toast({
+				title: 'Conversion Failed',
+				description: 'Could not convert to Postman collection.',
+				variant: 'destructive',
+			});
 			return;
 		}
 
@@ -129,15 +156,24 @@ const ProjectDetailPage = () => {
 
 		try {
 			collectionString = JSON.stringify(postmanCollection, null, 2);
-		}
-		catch (err) {
-			toast({ title: 'Download Error', description: 'Could not prepare Postman data.', variant: 'destructive' });
+		} catch (err) {
+			toast({
+				title: 'Download Error',
+				description: 'Could not prepare Postman data.',
+				variant: 'destructive',
+			});
 			return;
 		}
 
-		const collectionNameForFile = (project?.name || 'api-collection').replace(/[^a-z0-9_.-]/gi, '_').toLowerCase();
+		const collectionNameForFile = (project?.name || 'api-collection')
+			.replace(/[^a-z0-9_.-]/gi, '_')
+			.toLowerCase();
 
-		downloadFileHelper(collectionString, `${collectionNameForFile}.postman_collection.json`, 'application/json');
+		downloadFileHelper(
+			collectionString,
+			`${collectionNameForFile}.postman_collection.json`,
+			'application/json',
+		);
 		toast({ title: 'Download Started', description: 'Postman collection is downloading.' });
 	};
 
@@ -167,7 +203,9 @@ const ProjectDetailPage = () => {
 				<h2 className="text-2xl font-bold text-red-500 mb-4">Error Loading Project</h2>
 
 				<p className="text-muted-foreground mb-6">
-					{projectError instanceof Error ? projectError.message : `Project with ID ${projectId} not found.`}
+					{projectError instanceof Error
+						? projectError.message
+						: `Project with ID ${projectId} not found.`}
 				</p>
 
 				<Button onClick={() => navigate('/')}>Back to Projects</Button>
@@ -179,12 +217,18 @@ const ProjectDetailPage = () => {
 		<div className="space-y-6">
 			<div className="flex flex-col md:flex-row gap-4 md:items-center justify-between mt-4 mb-12">
 				<div>
-					<h1 className="text-3xl font-bold text-gradient" style={{ unicodeBidi: 'plaintext' }}>
+					<h1
+						className="text-3xl font-bold text-gradient"
+						style={{ unicodeBidi: 'plaintext' }}
+					>
 						{project.name}
 					</h1>
 
 					{project.description && (
-						<p className="text-muted-foreground mt-3 whitespace-pre-line max-w-[1200px]" style={{ unicodeBidi: 'plaintext' }}>
+						<p
+							className="text-muted-foreground mt-3 whitespace-pre-line max-w-[1200px]"
+							style={{ unicodeBidi: 'plaintext' }}
+						>
 							{project.description}
 						</p>
 					)}
@@ -192,15 +236,27 @@ const ProjectDetailPage = () => {
 				<div className="flex flex-col sm:flex-row md:flex-col gap-2 self-start md:self-center flex-shrink-0">
 					{isProjectOwner(project) && (
 						<>
-							<Button variant="outline" className="w-full sm:w-auto md:w-full" onClick={() => setIsAccessModalOpen(true)}>
+							<Button
+								variant="outline"
+								className="w-full sm:w-auto md:w-full"
+								onClick={() => setIsAccessModalOpen(true)}
+							>
 								<Users className="h-4 w-4 mr-2" /> Manage Access
 							</Button>
 
-							<Button variant="outline" className="w-full sm:w-auto md:w-full" onClick={handleEditProject}>
+							<Button
+								variant="outline"
+								className="w-full sm:w-auto md:w-full"
+								onClick={handleEditProject}
+							>
 								<Edit3 className="h-4 w-4 mr-2" /> Edit Project
 							</Button>
 
-							<Button variant="destructive" className="w-full sm:w-auto md:w-full" onClick={handleDeleteProject}>
+							<Button
+								variant="destructive"
+								className="w-full sm:w-auto md:w-full"
+								onClick={handleDeleteProject}
+							>
 								<Trash2 className="h-4 w-4 mr-2" /> Delete Project
 							</Button>
 						</>
@@ -224,7 +280,11 @@ const ProjectDetailPage = () => {
 							size="sm"
 							className="text-xs"
 							onClick={() =>
-								window.open(link.url.startsWith('http') ? link.url : 'https://' + link.url, '_blank', 'noopener,noreferrer')
+								window.open(
+									link.url.startsWith('http') ? link.url : 'https://' + link.url,
+									'_blank',
+									'noopener,noreferrer',
+								)
 							}
 						>
 							<SquareArrowOutUpRight className="h-3 w-3 mr-1.5" /> {link.name}
@@ -237,20 +297,36 @@ const ProjectDetailPage = () => {
 				<h2 className="text-2xl font-bold text-gradient-green">API Documentation</h2>
 
 				<div className="flex flex-wrap gap-2">
-					<Button variant="outline" onClick={handleDownloadOpenApiSpecJson} disabled={!openApiSpec}>
+					<Button
+						variant="outline"
+						onClick={handleDownloadOpenApiSpecJson}
+						disabled={!openApiSpec}
+					>
 						<Download className="h-4 w-4 mr-2" /> OpenAPI (JSON)
 					</Button>
 
-					<Button variant="outline" onClick={handleDownloadOpenApiSpecYaml} disabled={!openApiSpec}>
+					<Button
+						variant="outline"
+						onClick={handleDownloadOpenApiSpecYaml}
+						disabled={!openApiSpec}
+					>
 						<Download className="h-4 w-4 mr-2" /> OpenAPI (YAML)
 					</Button>
 
-					<Button variant="outline" onClick={handleDownloadPostmanCollection} disabled={!openApiSpec}>
+					<Button
+						variant="outline"
+						onClick={handleDownloadPostmanCollection}
+						disabled={!openApiSpec}
+					>
 						<Download className="h-4 w-4 mr-2" /> Postman
 					</Button>
 
 					{isProjectOwner(project) && (
-						<Button variant="outline" onClick={() => setIsOpenApiEditorOpen(true)} disabled={!openApiSpec}>
+						<Button
+							variant="outline"
+							onClick={() => setIsOpenApiEditorOpen(true)}
+							disabled={!openApiSpec}
+						>
 							<Edit3 className="h-4 w-4 mr-2" /> Edit Open API
 						</Button>
 					)}
@@ -266,16 +342,28 @@ const ProjectDetailPage = () => {
 				{openApiSpec ? (
 					<EndpointsList openApiSpec={openApiSpec} projectId={projectId || ''} />
 				) : (
-					!isLoading && <p className="text-muted-foreground text-center py-8">No API specification loaded for this project.</p>
+					!isLoading && (
+						<p className="text-muted-foreground text-center py-8">
+							No API specification loaded for this project.
+						</p>
+					)
 				)}
 			</div>
 
 			{isEditProjectModalOpen && project && (
-				<ProjectForm open={isEditProjectModalOpen} onClose={() => setIsEditProjectModalOpen(false)} project={project} />
+				<ProjectForm
+					open={isEditProjectModalOpen}
+					onClose={() => setIsEditProjectModalOpen(false)}
+					project={project}
+				/>
 			)}
 
 			{isAccessModalOpen && project && (
-				<ProjectAccessForm project={project} isOpen={isAccessModalOpen} onClose={() => setIsAccessModalOpen(false)} />
+				<ProjectAccessForm
+					project={project}
+					isOpen={isAccessModalOpen}
+					onClose={() => setIsAccessModalOpen(false)}
+				/>
 			)}
 
 			{isOpenApiEditorOpen && openApiSpec && project && (
@@ -295,13 +383,15 @@ const ProjectDetailPage = () => {
 							<AlertDialogTitle>Are you sure?</AlertDialogTitle>
 
 							<AlertDialogDescription className="py-1 leading-6">
-								This will permanently delete the project "{project.name}" and all of its endpoints. This action cannot be
-								undone.
+								This will permanently delete the project "{project.name}" and all of
+								its endpoints. This action cannot be undone.
 							</AlertDialogDescription>
 						</AlertDialogHeader>
 
 						<AlertDialogFooter>
-							<AlertDialogCancel disabled={deleteProjectMutation.isPending}>Cancel</AlertDialogCancel>
+							<AlertDialogCancel disabled={deleteProjectMutation.isPending}>
+								Cancel
+							</AlertDialogCancel>
 
 							<AlertDialogAction
 								onClick={confirmDeleteProject}

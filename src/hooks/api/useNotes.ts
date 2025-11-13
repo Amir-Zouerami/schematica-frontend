@@ -5,10 +5,23 @@ export const useCreateNote = () => {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: async ({ projectId, method, path, content }: { projectId: string; method: string; path: string; content: string }) => {
-			const response = await api.post(`/projects/${projectId}/endpoints/${method}${path}/notes`, {
-				content,
-			});
+		mutationFn: async ({
+			projectId,
+			method,
+			path,
+			content,
+		}: {
+			projectId: string;
+			method: string;
+			path: string;
+			content: string;
+		}) => {
+			const response = await api.post(
+				`/projects/${projectId}/endpoints/${method}${path}/notes`,
+				{
+					content,
+				},
+			);
 
 			if (response.error) {
 				throw new Error(response.error);
@@ -27,8 +40,20 @@ export const useDeleteNote = () => {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: async ({ projectId, method, path, noteIndex }: { projectId: string; method: string; path: string; noteIndex: number }) => {
-			const response = await api.delete(`/projects/${projectId}/endpoints/${method}${path}/notes/${noteIndex}`);
+		mutationFn: async ({
+			projectId,
+			method,
+			path,
+			noteIndex,
+		}: {
+			projectId: string;
+			method: string;
+			path: string;
+			noteIndex: number;
+		}) => {
+			const response = await api.delete(
+				`/projects/${projectId}/endpoints/${method}${path}/notes/${noteIndex}`,
+			);
 
 			if (response.error) {
 				throw new Error(response.error);

@@ -12,7 +12,12 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import React, { useState, useEffect, useMemo } from 'react';
 import { resolveRef, isRefObject } from '@/utils/schemaUtils';
 import { OpenAPISpec, OperationObject, ReferenceObject, PathItemObject } from '@/types/types';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import {
+	Accordion,
+	AccordionContent,
+	AccordionItem,
+	AccordionTrigger,
+} from '@/components/ui/accordion';
 import { useDeleteEndpoint } from '@/hooks/api/useEndpoints';
 
 import {
@@ -39,7 +44,10 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 	const navigate = useNavigate();
 
 	const deleteEndpointMutation = useDeleteEndpoint();
-	const [endpointToDelete, setEndpointToDelete] = useState<{ path: string; method: string } | null>(null);
+	const [endpointToDelete, setEndpointToDelete] = useState<{
+		path: string;
+		method: string;
+	} | null>(null);
 	const [openAccordionItems, setOpenAccordionItems] = useState<string[]>([]);
 	const [itemToScrollTo, setItemToScrollTo] = useState<string | null>(null);
 
@@ -48,28 +56,25 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 			const elementIdFromHash = location.hash.substring(1);
 			if (elementIdFromHash) {
 				const allGeneratedIds = Object.values(groupedEndpoints)
-				.flat()
-				.map(ep => generateEndpointId(ep.method, ep.path));
+					.flat()
+					.map((ep) => generateEndpointId(ep.method, ep.path));
 
 				if (allGeneratedIds.includes(elementIdFromHash)) {
 					if (!openAccordionItems.includes(elementIdFromHash)) {
-						setOpenAccordionItems(prev => {
+						setOpenAccordionItems((prev) => {
 							if (prev.includes(elementIdFromHash)) return prev;
 							return [...prev, elementIdFromHash];
 						});
 					}
 
 					setItemToScrollTo(elementIdFromHash);
-				}
-				else {
+				} else {
 					setItemToScrollTo(null);
 				}
-			}
-			else {
+			} else {
 				setItemToScrollTo(null);
 			}
-		}
-		else {
+		} else {
 			setItemToScrollTo(null);
 		}
 	}, [location.hash, openApiSpec]);
@@ -85,8 +90,7 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 				}, 200);
 
 				return () => clearTimeout(timer);
-			}
-			else {
+			} else {
 				const retryTimer = setTimeout(() => {
 					const el = document.getElementById(itemToScrollTo);
 					if (el) {
@@ -110,40 +114,64 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 		head: 'bg-gray-600 hover:bg-gray-700',
 	};
 
-	const handleCopyCurl = (path: string, method: string, operationOrRef: OperationObject | ReferenceObject) => {
+	const handleCopyCurl = (
+		path: string,
+		method: string,
+		operationOrRef: OperationObject | ReferenceObject,
+	) => {
 		try {
 			if (!openApiSpec || !openApiSpec.servers || openApiSpec.servers.length === 0) {
-				toast({ title: 'Configuration Error', description: 'No server URL defined.', variant: 'destructive' });
+				toast({
+					title: 'Configuration Error',
+					description: 'No server URL defined.',
+					variant: 'destructive',
+				});
 				return;
 			}
 
 			let operationToUse: OperationObject | null = null;
 			if (isRefObject(operationOrRef)) {
 				const resolved = resolveRef(operationOrRef.$ref, openApiSpec);
-				operationToUse = resolved && !isRefObject(resolved) ? (resolved as OperationObject) : null;
-			}
-			else {
+				operationToUse =
+					resolved && !isRefObject(resolved) ? (resolved as OperationObject) : null;
+			} else {
 				operationToUse = operationOrRef as OperationObject;
 			}
 
 			if (!operationToUse) {
-				toast({ title: 'Error', description: 'Operation data for CURL unavailable.', variant: 'destructive' });
+				toast({
+					title: 'Error',
+					description: 'Operation data for CURL unavailable.',
+					variant: 'destructive',
+				});
 				return;
 			}
 
 			const baseServerUrl = openApiSpec.servers[0].url;
-			const curlCommand = convertOpenApiToCurl(baseServerUrl, path, method, operationToUse, openApiSpec);
+			const curlCommand = convertOpenApiToCurl(
+				baseServerUrl,
+				path,
+				method,
+				operationToUse,
+				openApiSpec,
+			);
 
 			navigator.clipboard
-			.writeText(curlCommand)
-			.then(() => {
-				toast({ title: 'Copied to clipboard', description: 'CURL command has been copied.' });
-			})
-			.catch(err => {
-				toast({ title: 'Copy Failed', description: 'Could not copy to clipboard.', variant: 'destructive' });
-			});
-		}
-		catch (error) {
+				.writeText(curlCommand)
+				.then(() => {
+					toast({
+						title: 'Copied to clipboard',
+						description: 'CURL command has been copied.',
+					});
+				})
+				.catch((err) => {
+					toast({
+						title: 'Copy Failed',
+						description: 'Could not copy to clipboard.',
+						variant: 'destructive',
+					});
+				});
+		} catch (error) {
 			toast({
 				title: 'CURL Generation Failed',
 				description: error instanceof Error ? error.message : 'Error.',
@@ -172,16 +200,25 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 			const { path, method } = endpointToDelete;
 			await deleteEndpointMutation.mutateAsync({ projectId, path, method });
 
-			toast({ title: 'Endpoint deleted', description: `${method.toUpperCase()} ${path} removed` });
+			toast({
+				title: 'Endpoint deleted',
+				description: `${method.toUpperCase()} ${path} removed`,
+			});
 
-			if (location.hash.includes(generateEndpointId(method, path).split('--').slice(0, -1).join('--'))) {
+			if (
+				location.hash.includes(
+					generateEndpointId(method, path).split('--').slice(0, -1).join('--'),
+				)
+			) {
 				navigate(location.pathname, { replace: true });
 			}
-		}
-		catch (error) {
-			toast({ title: 'Delete failed', description: error instanceof Error ? error.message : 'Error.', variant: 'destructive' });
-		}
-		finally {
+		} catch (error) {
+			toast({
+				title: 'Delete failed',
+				description: error instanceof Error ? error.message : 'Error.',
+				variant: 'destructive',
+			});
+		} finally {
 			setEndpointToDelete(null);
 		}
 	};
@@ -190,9 +227,9 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 		const methodPart = method.toLowerCase();
 
 		const pathPart = path
-		.replace(/^\//, '') // Remove leading slash
-		.replace(/[\/{}]/g, '-') // Replace slashes and curly braces with hyphens
-		.replace(/[^a-zA-Z0-9-]/g, ''); // Remove any remaining non-URL-friendly characters
+			.replace(/^\//, '') // Remove leading slash
+			.replace(/[\/{}]/g, '-') // Replace slashes and curly braces with hyphens
+			.replace(/[^a-zA-Z0-9-]/g, ''); // Remove any remaining non-URL-friendly characters
 
 		return `${methodPart}-${pathPart}`;
 	};
@@ -202,31 +239,44 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 	};
 
 	const groupedEndpoints = useMemo(() => {
-		const groups: Record<string, { path: string; method: string; operation: OperationObject | ReferenceObject }[]> = {};
+		const groups: Record<
+			string,
+			{ path: string; method: string; operation: OperationObject | ReferenceObject }[]
+		> = {};
 
 		Object.entries(openApiSpec.paths || {}).forEach(([path, pathItemUntyped]) => {
 			const pathItem = pathItemUntyped as PathItemObject;
 
 			Object.entries(pathItem).forEach(([method, operationOrRef]) => {
-				if (['get', 'post', 'put', 'delete', 'patch', 'options', 'head'].includes(method.toLowerCase())) {
+				if (
+					['get', 'post', 'put', 'delete', 'patch', 'options', 'head'].includes(
+						method.toLowerCase(),
+					)
+				) {
 					let currentOperationForTag: OperationObject | null = null;
 
 					if (isRefObject(operationOrRef)) {
 						const resolved = resolveRef(operationOrRef.$ref, openApiSpec);
-						if (resolved && !isRefObject(resolved)) currentOperationForTag = resolved as OperationObject;
-					}
-					else {
+						if (resolved && !isRefObject(resolved))
+							currentOperationForTag = resolved as OperationObject;
+					} else {
 						currentOperationForTag = operationOrRef as OperationObject;
 					}
 
 					const tagName =
-						currentOperationForTag?.tags && currentOperationForTag.tags.length > 0 ? currentOperationForTag.tags[0] : 'Default';
+						currentOperationForTag?.tags && currentOperationForTag.tags.length > 0
+							? currentOperationForTag.tags[0]
+							: 'Default';
 
 					if (!groups[tagName]) {
 						groups[tagName] = [];
 					}
 
-					groups[tagName].push({ path, method: method.toLowerCase(), operation: operationOrRef });
+					groups[tagName].push({
+						path,
+						method: method.toLowerCase(),
+						operation: operationOrRef,
+					});
 				}
 			});
 		});
@@ -237,16 +287,22 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 			return a.localeCompare(b);
 		});
 
-		const orderedGroups: Record<string, Array<{ path: string; method: string; operation: OperationObject | ReferenceObject }>> = {};
+		const orderedGroups: Record<
+			string,
+			Array<{ path: string; method: string; operation: OperationObject | ReferenceObject }>
+		> = {};
 
-		sortedTagNames.forEach(tagName => {
+		sortedTagNames.forEach((tagName) => {
 			orderedGroups[tagName] = groups[tagName];
 		});
 
 		return orderedGroups;
 	}, [openApiSpec]);
 
-	const allEndpointCount = Object.values(groupedEndpoints).reduce((acc, group) => acc + group.length, 0);
+	const allEndpointCount = Object.values(groupedEndpoints).reduce(
+		(acc, group) => acc + group.length,
+		0,
+	);
 
 	if (allEndpointCount === 0) {
 		return (
@@ -262,10 +318,17 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 			{Object.entries(groupedEndpoints).map(([tagName, endpointsInGroup], groupIdx) => (
 				<div key={tagName} className={groupIdx === 0 ? 'mt-10' : 'mt-16'}>
 					<h3 className="text-xl font-semibold text-gradient-pink-sunset mb-4 capitalize">
-						{tagName.replace(/([A-Z])|@\d+/g, (match, p1) => (p1 ? ` ${p1}` : '')).trim() || 'General'}
+						{tagName
+							.replace(/([A-Z])|@\d+/g, (match, p1) => (p1 ? ` ${p1}` : ''))
+							.trim() || 'General'}
 					</h3>
 
-					<Accordion type="multiple" className="space-y-4" value={openAccordionItems} onValueChange={handleAccordionValueChange}>
+					<Accordion
+						type="multiple"
+						className="space-y-4"
+						value={openAccordionItems}
+						onValueChange={handleAccordionValueChange}
+					>
 						{endpointsInGroup.map(({ path, method, operation: operationOrRef }) => {
 							const endpointId = generateEndpointId(method, path);
 							let displayOpSummary: string | undefined;
@@ -278,10 +341,10 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 									displayOpSummary = (resolved as OperationObject).summary;
 									displayOpDeprecated = (resolved as OperationObject).deprecated;
 								}
-							}
-							else {
+							} else {
 								displayOpSummary = (operationOrRef as OperationObject).summary;
-								displayOpDeprecated = (operationOrRef as OperationObject).deprecated;
+								displayOpDeprecated = (operationOrRef as OperationObject)
+									.deprecated;
 							}
 
 							return (
@@ -295,13 +358,16 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 										<div className="flex items-center space-x-3 w-full text-left">
 											<Badge
 												className={`uppercase text-white font-bold w-[70px] text-center justify-center ${
-													methodColors[method] || 'bg-gray-500 hover:bg-gray-600'
+													methodColors[method] ||
+													'bg-gray-500 hover:bg-gray-600'
 												}`}
 											>
 												{method}
 											</Badge>
 
-											<span className="font-mono font-semibold text-sm truncate flex-grow min-w-0">{path}</span>
+											<span className="font-mono font-semibold text-sm truncate flex-grow min-w-0">
+												{path}
+											</span>
 
 											{displayOpSummary && (
 												<span
@@ -313,7 +379,10 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 											)}
 
 											{displayOpDeprecated && (
-												<Badge variant="outline" className="ml-auto flex-shrink-0">
+												<Badge
+													variant="outline"
+													className="ml-auto flex-shrink-0"
+												>
 													Deprecated
 												</Badge>
 											)}
@@ -332,14 +401,20 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 											/>
 
 											<div className="flex justify-end space-x-2 p-4 bg-secondary/20 border-t border-border">
-												<Button variant="outline" size="sm" onClick={() => handleShareEndpoint(endpointId)}>
+												<Button
+													variant="outline"
+													size="sm"
+													onClick={() => handleShareEndpoint(endpointId)}
+												>
 													<LinkIcon className="h-4 w-4 mr-1" /> Share Link
 												</Button>
 
 												<Button
 													variant="outline"
 													size="sm"
-													onClick={() => handleCopyCurl(path, method, operationOrRef)}
+													onClick={() =>
+														handleCopyCurl(path, method, operationOrRef)
+													}
 												>
 													<Copy className="h-4 w-4 mr-1" /> Copy CURL
 												</Button>
@@ -348,7 +423,9 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 													<Button
 														variant="destructive"
 														size="sm"
-														onClick={() => confirmDeleteEndpoint(path, method)}
+														onClick={() =>
+															confirmDeleteEndpoint(path, method)
+														}
 													>
 														Delete Endpoint
 													</Button>
@@ -381,7 +458,10 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 					</AlertDialogHeader>
 
 					<AlertDialogFooter>
-						<AlertDialogCancel onClick={cancelDelete} disabled={deleteEndpointMutation.isPending}>
+						<AlertDialogCancel
+							onClick={cancelDelete}
+							disabled={deleteEndpointMutation.isPending}
+						>
 							Cancel
 						</AlertDialogCancel>
 

@@ -66,8 +66,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({ projectId, path, method, op
 			});
 
 			setNewNoteContent('');
-		}
-		catch (error) {
+		} catch (error) {
 			toast({
 				title: 'Error',
 				description: error instanceof Error ? error.message : 'Failed to add note',
@@ -89,8 +88,7 @@ const NotesSection: React.FC<NotesSectionProps> = ({ projectId, path, method, op
 				title: 'Note Deleted',
 				description: 'The note has been deleted successfully',
 			});
-		}
-		catch (error) {
+		} catch (error) {
 			toast({
 				title: 'Error',
 				description: error instanceof Error ? error.message : 'Failed to delete note',
@@ -110,16 +108,17 @@ const NotesSection: React.FC<NotesSectionProps> = ({ projectId, path, method, op
 				noteIndex: noteToDelete,
 			});
 
-			toast({ title: 'Note Deleted', description: 'The note has been deleted successfully.' });
-		}
-		catch (error) {
+			toast({
+				title: 'Note Deleted',
+				description: 'The note has been deleted successfully.',
+			});
+		} catch (error) {
 			toast({
 				title: 'Error',
 				description: error instanceof Error ? error.message : 'Failed to delete note',
 				variant: 'destructive',
 			});
-		}
-		finally {
+		} finally {
 			setNoteToDelete(null);
 		}
 	};
@@ -134,21 +133,33 @@ const NotesSection: React.FC<NotesSectionProps> = ({ projectId, path, method, op
 						<div key={index} className="bg-secondary/20 rounded-lg p-4 border">
 							<div className="flex items-start justify-between gap-4">
 								<div className="flex-1">
-									<p className="whitespace-pre-line text-sm" style={{ unicodeBidi: 'plaintext' }}>
+									<p
+										className="whitespace-pre-line text-sm"
+										style={{ unicodeBidi: 'plaintext' }}
+									>
 										{note.content}
 									</p>
 
 									<div className="flex items-center space-x-2 mt-3 text-xs text-muted-foreground">
 										<Avatar className="h-5 w-5">
 											<AvatarImage
-												src={note.createdBy ? `/profile-pictures/${note.createdBy}.png` : undefined}
+												src={
+													note.createdBy
+														? `/profile-pictures/${note.createdBy}.png`
+														: undefined
+												}
 												alt={note.createdBy || 'Unknown'}
 											/>
-											<AvatarFallback>{(note.createdBy || 'U').substring(0, 2).toUpperCase()}</AvatarFallback>
+											<AvatarFallback>
+												{(note.createdBy || 'U')
+													.substring(0, 2)
+													.toUpperCase()}
+											</AvatarFallback>
 										</Avatar>
 
 										<span>
-											{note.createdBy || 'Unknown'} • {formatDate(note.createdAt) || 'Unknown date'}
+											{note.createdBy || 'Unknown'} •{' '}
+											{formatDate(note.createdAt) || 'Unknown date'}
 										</span>
 									</div>
 								</div>
@@ -172,12 +183,17 @@ const NotesSection: React.FC<NotesSectionProps> = ({ projectId, path, method, op
 												<AlertDialogTitle>Are you sure?</AlertDialogTitle>
 
 												<AlertDialogDescription className="py-1 leading-6">
-													This action cannot be undone. This will permanently delete this note.
+													This action cannot be undone. This will
+													permanently delete this note.
 												</AlertDialogDescription>
 											</AlertDialogHeader>
 
 											<AlertDialogFooter>
-												<AlertDialogCancel onClick={() => setNoteToDelete(null)}>Cancel</AlertDialogCancel>
+												<AlertDialogCancel
+													onClick={() => setNoteToDelete(null)}
+												>
+													Cancel
+												</AlertDialogCancel>
 												<AlertDialogAction
 													onClick={confirmDeleteNote}
 													className="bg-destructive hover:bg-destructive/90 text-white"
@@ -197,12 +213,16 @@ const NotesSection: React.FC<NotesSectionProps> = ({ projectId, path, method, op
 			<div className="border-t pt-4 space-y-3">
 				<Textarea
 					value={newNoteContent}
-					onChange={e => setNewNoteContent(e.target.value)}
+					onChange={(e) => setNewNoteContent(e.target.value)}
 					placeholder="Add a note about this endpoint..."
 					className="min-h-[100px]"
 				/>
 
-				<Button onClick={handleAddNote} disabled={createNoteMutation.isPending || !newNoteContent.trim()} className="w-full">
+				<Button
+					onClick={handleAddNote}
+					disabled={createNoteMutation.isPending || !newNoteContent.trim()}
+					className="w-full"
+				>
 					{createNoteMutation.isPending ? 'Adding Note...' : 'Add Note'}
 				</Button>
 			</div>

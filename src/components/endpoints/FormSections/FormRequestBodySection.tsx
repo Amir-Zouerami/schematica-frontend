@@ -4,7 +4,13 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from '@/components/ui/select';
 
 export interface ManagedRequestBodyUI {
 	description: string;
@@ -55,7 +61,7 @@ const FormRequestBodySection: React.FC<FormRequestBodySectionProps> = ({
 
 				<Select
 					value={requestBodyState.contentType}
-					onValueChange={val => onUpdateRequestBodyState('contentType', val)}
+					onValueChange={(val) => onUpdateRequestBodyState('contentType', val)}
 					disabled={isSubmittingForm}
 				>
 					<SelectTrigger id={`${formIdPrefix}-reqContentType`}>
@@ -76,7 +82,7 @@ const FormRequestBodySection: React.FC<FormRequestBodySectionProps> = ({
 				<Input
 					id={`${formIdPrefix}-reqDesc`}
 					value={requestBodyState.description}
-					onChange={e => onUpdateRequestBodyState('description', e.target.value)}
+					onChange={(e) => onUpdateRequestBodyState('description', e.target.value)}
 					disabled={isSubmittingForm}
 				/>
 			</div>
@@ -85,7 +91,7 @@ const FormRequestBodySection: React.FC<FormRequestBodySectionProps> = ({
 				<Switch
 					id={`${formIdPrefix}-reqRequired`}
 					checked={requestBodyState.required}
-					onCheckedChange={val => onUpdateRequestBodyState('required', val)}
+					onCheckedChange={(val) => onUpdateRequestBodyState('required', val)}
 					disabled={isSubmittingForm}
 				/>
 				<Label htmlFor={`${formIdPrefix}-reqRequired`}>Required</Label>
@@ -96,7 +102,7 @@ const FormRequestBodySection: React.FC<FormRequestBodySectionProps> = ({
 				<Textarea
 					id={`${formIdPrefix}-reqSchema`}
 					value={requestBodyState.schemaString}
-					onChange={e => onUpdateRequestBodyState('schemaString', e.target.value)}
+					onChange={(e) => onUpdateRequestBodyState('schemaString', e.target.value)}
 					className="font-mono"
 					rows={8}
 					disabled={isSubmittingForm}
@@ -108,7 +114,7 @@ const FormRequestBodySection: React.FC<FormRequestBodySectionProps> = ({
 				<Textarea
 					id={`${formIdPrefix}-reqExample`}
 					value={requestBodyState.exampleString}
-					onChange={e => onUpdateRequestBodyState('exampleString', e.target.value)}
+					onChange={(e) => onUpdateRequestBodyState('exampleString', e.target.value)}
 					className="font-mono"
 					rows={8}
 					disabled={isSubmittingForm}

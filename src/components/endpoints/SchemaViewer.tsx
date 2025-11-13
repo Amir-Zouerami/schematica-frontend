@@ -4,8 +4,21 @@ import { Button } from '@/components/ui/button';
 import React, { useState, useMemo } from 'react';
 import SimpleCodeBlock from '../ui/SimpleCodeBlock';
 import { OpenAPISpec, SchemaObject, ReferenceObject } from '@/types/types';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { isRefObject, resolveRef, deeplyResolveReferences, getTypeString, getRefName } from '@/utils/schemaUtils';
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from '@/components/ui/table';
+import {
+	isRefObject,
+	resolveRef,
+	deeplyResolveReferences,
+	getTypeString,
+	getRefName,
+} from '@/utils/schemaUtils';
 
 interface SchemaViewerProps {
 	schema: SchemaObject | ReferenceObject;
@@ -44,7 +57,8 @@ const SchemaViewer: React.FC<SchemaViewerProps> = ({
 
 		return (
 			<div className={`text-sm text-destructive ${isNested ? 'ml-4 pl-3 border-l' : ''}`}>
-				Error: Could not fully resolve schema or reference: {isRefObject(initialSchema) ? <code>{refPath}</code> : name || 'schema'}.
+				Error: Could not fully resolve schema or reference:{' '}
+				{isRefObject(initialSchema) ? <code>{refPath}</code> : name || 'schema'}.
 			</div>
 		);
 	}
@@ -53,7 +67,8 @@ const SchemaViewer: React.FC<SchemaViewerProps> = ({
 		if ('error' in schema && typeof (schema as any).error === 'string') {
 			return (
 				<div className="text-xs text-destructive italic">
-					Error resolving <code>{(initialSchema as ReferenceObject).$ref}</code>: {(schema as any).error}
+					Error resolving <code>{(initialSchema as ReferenceObject).$ref}</code>:{' '}
+					{(schema as any).error}
 				</div>
 			);
 		}
@@ -70,7 +85,11 @@ const SchemaViewer: React.FC<SchemaViewerProps> = ({
 	const resolvedSchema = schema as SchemaObject;
 
 	if (depth > MAX_RECURSION_DEPTH) {
-		return <div className="text-xs text-muted-foreground italic ml-4">[Max display depth reached]</div>;
+		return (
+			<div className="text-xs text-muted-foreground italic ml-4">
+				[Max display depth reached]
+			</div>
+		);
 	}
 
 	const toggleExpand = () => setIsExpanded(!isExpanded);
@@ -81,7 +100,9 @@ const SchemaViewer: React.FC<SchemaViewerProps> = ({
 
 	const renderProperties = () => {
 		if (!resolvedSchema.properties || Object.keys(resolvedSchema.properties).length === 0) {
-			return <p className="text-xs text-muted-foreground italic mt-1">No properties defined.</p>;
+			return (
+				<p className="text-xs text-muted-foreground italic mt-1">No properties defined.</p>
+			);
 		}
 
 		return (
@@ -96,65 +117,77 @@ const SchemaViewer: React.FC<SchemaViewerProps> = ({
 				</TableHeader>
 
 				<TableBody>
-					{Object.entries(resolvedSchema.properties!).map(([propName, propSchemaUntyped]) => {
-						const propSchema = propSchemaUntyped as SchemaObject | ReferenceObject;
-						const propTypeDisplay = getTypeString(propSchema, openApiSpec);
-						const isRequired = resolvedSchema.required?.includes(propName) || false;
+					{Object.entries(resolvedSchema.properties!).map(
+						([propName, propSchemaUntyped]) => {
+							const propSchema = propSchemaUntyped as SchemaObject | ReferenceObject;
+							const propTypeDisplay = getTypeString(propSchema, openApiSpec);
+							const isRequired = resolvedSchema.required?.includes(propName) || false;
 
-						const propDescription =
-							(isRefObject(propSchema)
-								? (resolveRef(propSchema.$ref, openApiSpec) as SchemaObject)?.description
-								: (propSchema as SchemaObject)?.description) || '';
+							const propDescription =
+								(isRefObject(propSchema)
+									? (resolveRef(propSchema.$ref, openApiSpec) as SchemaObject)
+											?.description
+									: (propSchema as SchemaObject)?.description) || '';
 
-						const isComplexProp =
-							isRefObject(propSchema) ||
-							((propSchema as SchemaObject)?.type === 'object' && !!(propSchema as SchemaObject).properties) ||
-							((propSchema as SchemaObject)?.type === 'array' && !!(propSchema as SchemaObject).items);
+							const isComplexProp =
+								isRefObject(propSchema) ||
+								((propSchema as SchemaObject)?.type === 'object' &&
+									!!(propSchema as SchemaObject).properties) ||
+								((propSchema as SchemaObject)?.type === 'array' &&
+									!!(propSchema as SchemaObject).items);
 
-						return (
-							<React.Fragment key={propName}>
-								<TableRow>
-									<TableCell className="font-mono py-1.5">{propName}</TableCell>
-
-									<TableCell className="py-1.5">
-										<Badge variant="secondary" className="text-xs">
-											{propTypeDisplay}
-										</Badge>
-									</TableCell>
-
-									<TableCell className="py-1.5">
-										{isRequired ? (
-											<Badge variant="default" className="text-xs bg-pink-600 hover:bg-pink-700">
-												Yes
-											</Badge>
-										) : (
-											<span className="text-muted-foreground">No</span>
-										)}
-									</TableCell>
-
-									<TableCell className="py-1.5 text-muted-foreground">{propDescription}</TableCell>
-								</TableRow>
-
-								{isExpanded && isComplexProp && depth < MAX_RECURSION_DEPTH && (
+							return (
+								<React.Fragment key={propName}>
 									<TableRow>
-										<TableCell colSpan={4} className="p-0 border-none">
-											<div className="ml-4 my-1 p-2 border-l-2 border-blue-500/30 bg-blue-500/5 rounded-r-md">
-												<SchemaViewer
-													schema={propSchema}
-													openApiSpec={openApiSpec}
-													name={propName}
-													depth={depth + 1}
-													isNested={true}
-													showNestedDetailsInitially={false}
-													showFullJsonButton={false}
-												/>
-											</div>
+										<TableCell className="font-mono py-1.5">
+											{propName}
+										</TableCell>
+
+										<TableCell className="py-1.5">
+											<Badge variant="secondary" className="text-xs">
+												{propTypeDisplay}
+											</Badge>
+										</TableCell>
+
+										<TableCell className="py-1.5">
+											{isRequired ? (
+												<Badge
+													variant="default"
+													className="text-xs bg-pink-600 hover:bg-pink-700"
+												>
+													Yes
+												</Badge>
+											) : (
+												<span className="text-muted-foreground">No</span>
+											)}
+										</TableCell>
+
+										<TableCell className="py-1.5 text-muted-foreground">
+											{propDescription}
 										</TableCell>
 									</TableRow>
-								)}
-							</React.Fragment>
-						);
-					})}
+
+									{isExpanded && isComplexProp && depth < MAX_RECURSION_DEPTH && (
+										<TableRow>
+											<TableCell colSpan={4} className="p-0 border-none">
+												<div className="ml-4 my-1 p-2 border-l-2 border-blue-500/30 bg-blue-500/5 rounded-r-md">
+													<SchemaViewer
+														schema={propSchema}
+														openApiSpec={openApiSpec}
+														name={propName}
+														depth={depth + 1}
+														isNested={true}
+														showNestedDetailsInitially={false}
+														showFullJsonButton={false}
+													/>
+												</div>
+											</TableCell>
+										</TableRow>
+									)}
+								</React.Fragment>
+							);
+						},
+					)}
 				</TableBody>
 			</Table>
 		);
@@ -162,7 +195,11 @@ const SchemaViewer: React.FC<SchemaViewerProps> = ({
 
 	const renderArrayItems = () => {
 		if (!resolvedSchema.items) {
-			return <p className="text-xs text-muted-foreground italic mt-1">No item type defined for array.</p>;
+			return (
+				<p className="text-xs text-muted-foreground italic mt-1">
+					No item type defined for array.
+				</p>
+			);
 		}
 
 		return (
@@ -199,7 +236,9 @@ const SchemaViewer: React.FC<SchemaViewerProps> = ({
 	};
 
 	const hasExpandableContent =
-		(resolvedSchema.type === 'object' && resolvedSchema.properties && Object.keys(resolvedSchema.properties).length > 0) ||
+		(resolvedSchema.type === 'object' &&
+			resolvedSchema.properties &&
+			Object.keys(resolvedSchema.properties).length > 0) ||
 		(resolvedSchema.type === 'array' && resolvedSchema.items) ||
 		(resolvedSchema.enum && resolvedSchema.enum.length > 0);
 
@@ -208,7 +247,11 @@ const SchemaViewer: React.FC<SchemaViewerProps> = ({
 			<div className="flex items-start justify-between gap-2">
 				<div className="flex-grow">
 					<div className="flex items-center flex-wrap gap-x-2 gap-y-1">
-						{name && <span className="font-mono text-sm font-medium text-foreground">{name}:</span>}
+						{name && (
+							<span className="font-mono text-sm font-medium text-foreground">
+								{name}:
+							</span>
+						)}
 
 						<Badge variant="outline" className="text-xs">
 							{typeDisplay}
@@ -239,12 +282,21 @@ const SchemaViewer: React.FC<SchemaViewerProps> = ({
 						)}
 					</div>
 
-					{description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
+					{description && (
+						<p className="text-xs text-muted-foreground mt-1">{description}</p>
+					)}
 				</div>
 
 				{hasExpandableContent && (
-					<Button variant="ghost" size="sm" className="p-0 h-6 w-6 flex-shrink-0" onClick={toggleExpand}>
-						<ChevronDown className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+					<Button
+						variant="ghost"
+						size="sm"
+						className="p-0 h-6 w-6 flex-shrink-0"
+						onClick={toggleExpand}
+					>
+						<ChevronDown
+							className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+						/>
 					</Button>
 				)}
 			</div>
@@ -272,7 +324,11 @@ const SchemaViewer: React.FC<SchemaViewerProps> = ({
 
 			{showFullJsonButton && isFullSchemaJsonVisible && (
 				<div className="mt-2">
-					<SimpleCodeBlock code={fullSchemaJsonForDisplay} language="json" showLineNumbers />
+					<SimpleCodeBlock
+						code={fullSchemaJsonForDisplay}
+						language="json"
+						showLineNumbers
+					/>
 				</div>
 			)}
 		</div>

@@ -1,30 +1,23 @@
 import { api } from '@/utils/api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { User } from '@/types/types';
+import type { components } from '@/types/api-types';
+
+type UserDto = components['schemas']['UserDto'];
+type UpdateUserDto = components['schemas']['UpdateUserDto'];
 
 export const ADMIN_USERS_QUERY_KEY = ['admin_users'];
 
 export const useAdminUsers = () => {
-	return useQuery<User[]>({
+	return useQuery({
 		queryKey: ADMIN_USERS_QUERY_KEY,
-		queryFn: async () => {
-			const response = await api.get<User[]>('/admin/users');
-
-			if (response.error) throw new Error(response.error);
-			return response.data || [];
-		},
+		queryFn: () => api.get<UserDto[]>('/admin/users'),
 	});
 };
 
 export const useCreateUser = () => {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: async (userData: FormData) => {
-			const response = await api.post<User>('/admin/users', userData);
-
-			if (response.error) throw new Error(response.error);
-			return response.data;
-		},
+		mutationFn: (userData: FormData) => api.post<UserDto>('/admin/users', userData),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ADMIN_USERS_QUERY_KEY });
 		},
@@ -34,12 +27,8 @@ export const useCreateUser = () => {
 export const useUpdateUser = () => {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: async ({ userId, userData }: { userId: string; userData: FormData }) => {
-			const response = await api.put<User>(`/admin/users/${userId}`, userData);
-
-			if (response.error) throw new Error(response.error);
-			return response.data;
-		},
+		mutationFn: ({ userId, userData }: { userId: string; userData: UpdateUserDto }) =>
+			api.put<UserDto>(`/admin/users/${userId}`, userData),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ADMIN_USERS_QUERY_KEY });
 		},
@@ -49,12 +38,7 @@ export const useUpdateUser = () => {
 export const useDeleteUserAdmin = () => {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: async (userId: string) => {
-			const response = await api.delete(`/admin/users/${userId}`);
-
-			if (response.error) throw new Error(response.error);
-			return response.data;
-		},
+		mutationFn: (userId: string) => api.delete<null>(`/admin/users/${userId}`),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ADMIN_USERS_QUERY_KEY });
 		},

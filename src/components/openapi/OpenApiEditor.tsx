@@ -6,7 +6,13 @@ import { useUpdateOpenApi } from '@/hooks/api/useProject';
 import { OpenAPISpec, Project } from '@/types/types';
 import { Maximize, Minimize, RefreshCcw, X } from 'lucide-react';
 import React, { useState, useEffect, lazy, Suspense, useRef } from 'react';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+	Dialog,
+	DialogContent,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
 
 import {
 	AlertDialog,
@@ -28,7 +34,13 @@ interface OpenApiEditorProps {
 	onClose: () => void;
 }
 
-const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, projectUpdatedAt, isOpen, onClose }) => {
+const OpenApiEditor: React.FC<OpenApiEditorProps> = ({
+	projectId,
+	openApi,
+	projectUpdatedAt,
+	isOpen,
+	onClose,
+}) => {
 	const { toast } = useToast();
 	const updateOpenApiMutation = useUpdateOpenApi();
 	const isSubmitting = updateOpenApiMutation.isPending;
@@ -37,9 +49,12 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 	const [isFullscreen, setIsFullscreen] = useState(false);
 	const [jsonError, setJsonError] = useState<string | null>(null);
 
-	const [lastKnownProjectUpdatedAt, setLastKnownProjectUpdatedAt] = useState<string>(projectUpdatedAt);
+	const [lastKnownProjectUpdatedAt, setLastKnownProjectUpdatedAt] =
+		useState<string>(projectUpdatedAt);
 	const [conflictError, setConflictError] = useState<string | null>(null);
-	const [serverConflictTimestamp, setServerConflictTimestamp] = useState<string | undefined>(undefined);
+	const [serverConflictTimestamp, setServerConflictTimestamp] = useState<string | undefined>(
+		undefined,
+	);
 
 	const initialOpenStateRef = useRef(false);
 
@@ -51,8 +66,7 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 			setConflictError(null);
 			setServerConflictTimestamp(undefined);
 			initialOpenStateRef.current = true;
-		}
-		else if (!isOpen) {
+		} else if (!isOpen) {
 			initialOpenStateRef.current = false;
 		}
 	}, [isOpen, openApi, projectUpdatedAt, conflictError]);
@@ -88,10 +102,11 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 				return parsed as OpenAPISpec;
 			}
 
-			setJsonError('Invalid OpenAPI structure: "openapi" version field is missing or format is incorrect.');
+			setJsonError(
+				'Invalid OpenAPI structure: "openapi" version field is missing or format is incorrect.',
+			);
 			return null;
-		}
-		catch (err) {
+		} catch (err) {
 			setJsonError(`Invalid JSON: ${err instanceof Error ? err.message : 'Unknown error'}`);
 			return null;
 		}
@@ -128,17 +143,23 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 			});
 
 			onClose();
-		}
-		catch (error: any) {
+		} catch (error: any) {
 			if (error?.status === 409) {
 				setServerConflictTimestamp(error.errorData?.serverUpdatedAt);
-				setConflictError(error.error || 'The OpenAPI specification has been modified by someone else since you started editing.');
+				setConflictError(
+					error.error ||
+						'The OpenAPI specification has been modified by someone else since you started editing.',
+				);
 				return;
 			}
 
 			toast({
 				title: 'Update Failed',
-				description: error?.error || (error instanceof Error ? error.message : 'Failed to update OpenAPI specification'),
+				description:
+					error?.error ||
+					(error instanceof Error
+						? error.message
+						: 'Failed to update OpenAPI specification'),
 				variant: 'destructive',
 			});
 		}
@@ -152,7 +173,8 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 		setConflictError(null);
 		toast({
 			title: 'Conflict Noted',
-			description: 'Your edits are still in the editor. Please review or copy them before proceeding.',
+			description:
+				'Your edits are still in the editor. Please review or copy them before proceeding.',
 			duration: 7000,
 		});
 	};
@@ -166,14 +188,18 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 			const projectRes = await api.get<Project>(`/projects/${projectId}`);
 
 			if (projectRes.error || !projectRes.data) {
-				throw new Error(projectRes.error || 'Failed to fetch latest project details for refresh.');
+				throw new Error(
+					projectRes.error || 'Failed to fetch latest project details for refresh.',
+				);
 			}
 
 			const latestProjectTimestamp = projectRes.data.updatedAt;
 
 			const specRes = await api.get<OpenAPISpec>(`/projects/${projectId}/openapi`);
 			if (specRes.error || !specRes.data) {
-				throw new Error(specRes.error || 'Failed to fetch latest OpenAPI spec for refresh.');
+				throw new Error(
+					specRes.error || 'Failed to fetch latest OpenAPI spec for refresh.',
+				);
 			}
 
 			setOpenApiString(JSON.stringify(specRes.data, null, 2));
@@ -183,13 +209,16 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 
 			toast({
 				title: 'Editor Content Reloaded',
-				description: 'Latest version loaded into the editor. Your previous unsaved edits were discarded.',
+				description:
+					'Latest version loaded into the editor. Your previous unsaved edits were discarded.',
 			});
-		}
-		catch (error) {
-			toast({ title: 'Refresh Failed', description: (error as Error).message, variant: 'destructive' });
-		}
-		finally {
+		} catch (error) {
+			toast({
+				title: 'Refresh Failed',
+				description: (error as Error).message,
+				variant: 'destructive',
+			});
+		} finally {
 			(updateOpenApiMutation.isPending as any) = false;
 		}
 	};
@@ -199,7 +228,12 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 			<div className="fixed inset-0 bg-background z-50 flex flex-col p-4">
 				<div className="flex justify-between items-center mb-4">
 					<h2 className="text-2xl font-bold text-gradient">Edit OpenAPI Specification</h2>
-					<Button variant="ghost" size="icon" onClick={toggleFullscreen} title="Exit Fullscreen">
+					<Button
+						variant="ghost"
+						size="icon"
+						onClick={toggleFullscreen}
+						title="Exit Fullscreen"
+					>
 						<Minimize className="h-5 w-5" />
 					</Button>
 				</div>
@@ -212,16 +246,27 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 
 				<div className="flex-grow overflow-auto border border-border rounded-md">
 					<Suspense fallback={<EditorLoading />}>
-						<OpenApiMonacoEditor onChange={handleChange} value={openApiString} height="calc(100vh - 160px)" />
+						<OpenApiMonacoEditor
+							onChange={handleChange}
+							value={openApiString}
+							height="calc(100vh - 160px)"
+						/>
 					</Suspense>
 				</div>
 
 				<div className="flex justify-end items-center mt-4 space-x-2">
-					<Button variant="outline" onClick={() => setIsFullscreen(false)} disabled={isSubmitting}>
+					<Button
+						variant="outline"
+						onClick={() => setIsFullscreen(false)}
+						disabled={isSubmitting}
+					>
 						Exit Fullscreen
 					</Button>
 
-					<Button onClick={() => handleSave(false)} disabled={isSubmitting || !!conflictError}>
+					<Button
+						onClick={() => handleSave(false)}
+						disabled={isSubmitting || !!conflictError}
+					>
 						{isSubmitting ? 'Saving...' : 'Save Changes'}
 					</Button>
 				</div>
@@ -233,7 +278,7 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 		<>
 			<Dialog
 				open={isOpen}
-				onOpenChange={openState => {
+				onOpenChange={(openState) => {
 					if (!openState && !isSubmitting) {
 						onClose();
 					}
@@ -242,9 +287,15 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 				<DialogContent className="max-h-[90vh] max-w-[90vw] lg:max-w-4xl xl:max-w-5xl 2xl:max-w-7xl w-full flex flex-col p-0 glass-card">
 					<DialogHeader className="p-6 pb-4 border-b">
 						<div className="flex justify-between items-center">
-
-							<DialogTitle className="text-2xl font-bold text-gradient">Edit OpenAPI Specification</DialogTitle>
-							<Button variant="ghost" size="icon" onClick={toggleFullscreen} title="Enter Fullscreen">
+							<DialogTitle className="text-2xl font-bold text-gradient">
+								Edit OpenAPI Specification
+							</DialogTitle>
+							<Button
+								variant="ghost"
+								size="icon"
+								onClick={toggleFullscreen}
+								title="Enter Fullscreen"
+							>
 								<Maximize className="h-5 w-5" />
 							</Button>
 						</div>
@@ -259,7 +310,11 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 
 						<div className="border border-border rounded-md overflow-hidden h-[65vh] min-h-[300px]">
 							<Suspense fallback={<EditorLoading />}>
-								<OpenApiMonacoEditor onChange={handleChange} value={openApiString} height="100%" />
+								<OpenApiMonacoEditor
+									onChange={handleChange}
+									value={openApiString}
+									height="100%"
+								/>
 							</Suspense>
 						</div>
 					</div>
@@ -269,7 +324,10 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 							Cancel
 						</Button>
 
-						<Button onClick={() => handleSave(false)} disabled={isSubmitting || !!conflictError}>
+						<Button
+							onClick={() => handleSave(false)}
+							disabled={isSubmitting || !!conflictError}
+						>
 							{isSubmitting ? 'Saving...' : 'Save Changes'}
 						</Button>
 					</DialogFooter>
@@ -279,7 +337,7 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 			{conflictError && (
 				<AlertDialog
 					open={!!conflictError}
-					onOpenChange={openDialog => {
+					onOpenChange={(openDialog) => {
 						if (!openDialog) {
 							setConflictError(null);
 						}
@@ -295,15 +353,20 @@ const OpenApiEditor: React.FC<OpenApiEditorProps> = ({ projectId, openApi, proje
 									{serverConflictTimestamp && (
 										<>
 											<p>
-												<strong>Last server update EN:</strong> {new Date(serverConflictTimestamp).toLocaleString()}
+												<strong>Last server update EN:</strong>{' '}
+												{new Date(serverConflictTimestamp).toLocaleString()}
 											</p>
 											<p>
 												<strong>Last server update FA:</strong>{' '}
-												{new Date(serverConflictTimestamp).toLocaleString('fa-IR')}
+												{new Date(serverConflictTimestamp).toLocaleString(
+													'fa-IR',
+												)}
 											</p>
 										</>
 									)}
-									<p className="mt-2">Your current unsaved edits are still in the editor.</p>
+									<p className="mt-2">
+										Your current unsaved edits are still in the editor.
+									</p>
 								</div>
 							</AlertDialogDescription>
 						</AlertDialogHeader>

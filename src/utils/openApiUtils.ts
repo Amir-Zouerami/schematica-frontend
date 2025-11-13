@@ -1,21 +1,22 @@
 /* eslint-disable no-case-declarations,no-prototype-builtins */
 
-import YAML from 'js-yaml';
-import { v4 as uuidv4 } from 'uuid';
-import * as curlconverter from 'curlconverter';
-import { resolveRef, isRefObject } from './schemaUtils';
+import { toJsonObject, ParsedCurlCommand } from '@/lib/curlconverter-wrapper';
 import {
+	ExampleObject,
 	OpenAPISpec,
 	OperationObject,
 	ParameterObject,
-	ReferenceObject,
-	SchemaObject,
-	RequestBodyObject,
 	PathItemObject,
-	ExampleObject,
+	ReferenceObject,
+	RequestBodyObject,
+	SchemaObject,
 } from '@/types/types';
+import YAML from 'js-yaml';
+import { v4 as uuidv4 } from 'uuid';
+import { isRefObject, resolveRef } from './schemaUtils';
 
-const isPlainObject = (value: any): value is object => value !== null && typeof value === 'object' && !Array.isArray(value);
+const isPlainObject = (value: any): value is object =>
+	value !== null && typeof value === 'object' && !Array.isArray(value);
 
 export const convertToYaml = (openApiSpec: OpenAPISpec): string => {
 	try {
@@ -23,8 +24,7 @@ export const convertToYaml = (openApiSpec: OpenAPISpec): string => {
 			indent: 2,
 			noRefs: true,
 		});
-	}
-	catch (error) {
+	} catch (error) {
 		return 'Failed to generate YAML';
 	}
 };
@@ -66,7 +66,11 @@ export const generateExampleValue = (
 		case 'boolean':
 			return false;
 		case 'string':
-			if (context?.parentContentType === 'application/x-www-form-urlencoded' && !s.format && (!s.enum || s.enum.length === 0)) {
+			if (
+				context?.parentContentType === 'application/x-www-form-urlencoded' &&
+				!s.format &&
+				(!s.enum || s.enum.length === 0)
+			) {
 				return `{{${placeholderName}}}`;
 			}
 
@@ -102,23 +106,29 @@ export const generateExampleValue = (
 			if (s.properties) {
 				if (context?.parentContentType === 'application/x-www-form-urlencoded') {
 					for (const propertyName in s.properties) {
-						if (Object.prototype.hasOwnProperty.call(s.properties, propertyName)) {
+						if (Object.hasOwn(s.properties, propertyName)) {
 							example[propertyName] = `{{${propertyName}}}`;
 						}
 					}
-				}
-				else {
+				} else {
 					const requiredProps = new Set(s.required || []);
 					const propsToShow = Object.keys(s.properties);
 					let count = 0;
 
 					for (const propertyName of propsToShow) {
 						if (Object.prototype.hasOwnProperty.call(s.properties, propertyName)) {
-							if (requiredProps.has(propertyName) || (requiredProps.size === 0 && count < 1)) {
-								example[propertyName] = generateExampleValue(s.properties[propertyName], openApiSpec, {
-									...context,
-									fieldName: propertyName,
-								});
+							if (
+								requiredProps.has(propertyName) ||
+								(requiredProps.size === 0 && count < 1)
+							) {
+								example[propertyName] = generateExampleValue(
+									s.properties[propertyName],
+									openApiSpec,
+									{
+										...context,
+										fieldName: propertyName,
+									},
+								);
 
 								count++;
 							}
@@ -126,11 +136,17 @@ export const generateExampleValue = (
 					}
 				}
 
-				if (Object.keys(example).length === 0 && Object.keys(s.properties).length > 0 && context?.fieldName === 'requestBody') {
+				if (
+					Object.keys(example).length === 0 &&
+					Object.keys(s.properties).length > 0 &&
+					context?.fieldName === 'requestBody'
+				) {
 					return {};
 				}
-			}
-			else if (s.additionalProperties === true || typeof s.additionalProperties === 'object') {
+			} else if (
+				s.additionalProperties === true ||
+				typeof s.additionalProperties === 'object'
+			) {
 				return { [`property_for_${placeholderName}`]: 'value' };
 			}
 			return example;
@@ -157,9 +173,15 @@ export const convertOpenApiToCurl = (
 	const headersToAdd: Record<string, string> = {};
 	const queryParamsList: { key: string; value: string }[] = [];
 
-	const operationParameters = (operation.parameters || []) as (ParameterObject | ReferenceObject)[];
+	const operationParameters = (operation.parameters || []) as (
+		| ParameterObject
+		| ReferenceObject
+	)[];
 	const pathItem = openApiSpec.paths[endpointPath] as PathItemObject | undefined;
-	const pathItemParameters = (pathItem?.parameters || []) as (ParameterObject | ReferenceObject)[];
+	const pathItemParameters = (pathItem?.parameters || []) as (
+		| ParameterObject
+		| ReferenceObject
+	)[];
 
 	const parameterMap = new Map<string, ParameterObject>();
 
@@ -172,8 +194,7 @@ export const convertOpenApiToCurl = (
 			if (resolved && !isRefObject(resolved)) {
 				paramDef = resolved as ParameterObject;
 			}
-		}
-		else {
+		} else {
 			paramDef = paramOrRef as ParameterObject;
 		}
 
@@ -195,8 +216,7 @@ export const convertOpenApiToCurl = (
 				if (resolvedSchema && !isRefObject(resolvedSchema)) {
 					actualSchema = resolvedSchema as SchemaObject;
 				}
-			}
-			else {
+			} else {
 				actualSchema = param.schema as SchemaObject;
 			}
 		}
@@ -209,16 +229,14 @@ export const convertOpenApiToCurl = (
 		return `{{${param.name}}}`;
 	};
 
-	combinedParameters.forEach(p => {
+	combinedParameters.forEach((p) => {
 		const valueToUse = getParameterValueForCurl(p);
 
 		if (p.in === 'header') {
 			headersToAdd[p.name] = valueToUse;
-		}
-		else if (p.in === 'query') {
+		} else if (p.in === 'query') {
 			queryParamsList.push({ key: p.name, value: valueToUse });
-		}
-		else if (p.in === 'path') {
+		} else if (p.in === 'path') {
 			if (valueToUse !== `{${p.name}}`) {
 				fullUrl = fullUrl.replace(`{${p.name}}`, encodeURIComponent(valueToUse));
 			}
@@ -226,7 +244,7 @@ export const convertOpenApiToCurl = (
 	});
 
 	if (queryParamsList.length > 0) {
-		const queryStringParts = queryParamsList.map(qp => {
+		const queryStringParts = queryParamsList.map((qp) => {
 			return `${qp.key}=${qp.value}`;
 		});
 		fullUrl += `?${queryStringParts.join('&')}`;
@@ -241,9 +259,9 @@ export const convertOpenApiToCurl = (
 
 		if (isRefObject(operation.requestBody)) {
 			const resolvedReqBody = resolveRef(operation.requestBody.$ref, openApiSpec);
-			if (resolvedReqBody && !isRefObject(resolvedReqBody)) reqBodyDef = resolvedReqBody as RequestBodyObject;
-		}
-		else {
+			if (resolvedReqBody && !isRefObject(resolvedReqBody))
+				reqBodyDef = resolvedReqBody as RequestBodyObject;
+		} else {
 			reqBodyDef = operation.requestBody as RequestBodyObject;
 		}
 
@@ -270,18 +288,27 @@ export const convertOpenApiToCurl = (
 			if (bodyContent) {
 				let exampleData: any;
 
-				if (bodyContent.examples && typeof bodyContent.examples === 'object' && Object.keys(bodyContent.examples).length > 0) {
+				if (
+					bodyContent.examples &&
+					typeof bodyContent.examples === 'object' &&
+					Object.keys(bodyContent.examples).length > 0
+				) {
 					const firstExampleName = Object.keys(bodyContent.examples)[0];
 					const firstExampleOrRef = bodyContent.examples[firstExampleName];
 
 					if (isRefObject(firstExampleOrRef)) {
-						const resolvedExampleComponent = resolveRef(firstExampleOrRef.$ref, openApiSpec);
+						const resolvedExampleComponent = resolveRef(
+							firstExampleOrRef.$ref,
+							openApiSpec,
+						);
 						exampleData = resolvedExampleComponent?.value;
-					}
-					else if (firstExampleOrRef && typeof firstExampleOrRef === 'object' && 'value' in firstExampleOrRef) {
+					} else if (
+						firstExampleOrRef &&
+						typeof firstExampleOrRef === 'object' &&
+						'value' in firstExampleOrRef
+					) {
 						exampleData = (firstExampleOrRef as ExampleObject).value;
-					}
-					else {
+					} else {
 						exampleData = firstExampleOrRef;
 					}
 				}
@@ -297,14 +324,18 @@ export const convertOpenApiToCurl = (
 				}
 
 				if (exampleData !== undefined) {
-					const explicitlySetContentType = headersToAdd['Content-Type'] || headersToAdd['content-type'];
-					const actualContentType = explicitlySetContentType || chosenContentType || 'text/plain';
+					const explicitlySetContentType =
+						headersToAdd['Content-Type'] || headersToAdd['content-type'];
+					const actualContentType =
+						explicitlySetContentType || chosenContentType || 'text/plain';
 
 					if (actualContentType.includes('json')) {
 						headersToAdd['Content-Type'] = 'application/json';
 						requestBodyDataString = JSON.stringify(exampleData, null, 2);
-					}
-					else if (actualContentType.includes('x-www-form-urlencoded') && isPlainObject(exampleData)) {
+					} else if (
+						actualContentType.includes('x-www-form-urlencoded') &&
+						isPlainObject(exampleData)
+					) {
 						headersToAdd['Content-Type'] = 'application/x-www-form-urlencoded';
 						const formDataParts: string[] = [];
 
@@ -315,22 +346,26 @@ export const convertOpenApiToCurl = (
 						}
 
 						requestBodyDataString = formDataParts.join('&');
-					}
-					else if (typeof exampleData === 'string') {
-						if (!headersToAdd['Content-Type'] && !headersToAdd['content-type'] && chosenContentType) {
+					} else if (typeof exampleData === 'string') {
+						if (
+							!headersToAdd['Content-Type'] &&
+							!headersToAdd['content-type'] &&
+							chosenContentType
+						) {
 							headersToAdd['Content-Type'] = chosenContentType;
-						}
-						else if (!headersToAdd['Content-Type'] && !headersToAdd['content-type']) {
+						} else if (!headersToAdd['Content-Type'] && !headersToAdd['content-type']) {
 							headersToAdd['Content-Type'] = 'text/plain';
 						}
 
 						requestBodyDataString = exampleData;
-					}
-					else {
-						if (!headersToAdd['Content-Type'] && !headersToAdd['content-type'] && chosenContentType) {
+					} else {
+						if (
+							!headersToAdd['Content-Type'] &&
+							!headersToAdd['content-type'] &&
+							chosenContentType
+						) {
 							headersToAdd['Content-Type'] = chosenContentType;
-						}
-						else if (!headersToAdd['Content-Type'] && !headersToAdd['content-type']) {
+						} else if (!headersToAdd['Content-Type'] && !headersToAdd['content-type']) {
 							headersToAdd['Content-Type'] = 'application/json';
 						}
 
@@ -348,12 +383,12 @@ export const convertOpenApiToCurl = (
 	}
 
 	if (requestBodyDataString) {
-		const contentTypeForDataFlag = headersToAdd['Content-Type'] || headersToAdd['content-type'] || '';
+		const contentTypeForDataFlag =
+			headersToAdd['Content-Type'] || headersToAdd['content-type'] || '';
 
 		if (contentTypeForDataFlag.includes('x-www-form-urlencoded')) {
 			curlCommand += ` --data-urlencode '${requestBodyDataString.replace(/'/g, "'\\''")}'`;
-		}
-		else {
+		} else {
 			const escapedDataForCurl = requestBodyDataString.replace(/'/g, "'\\''");
 			curlCommand += ` -d '${escapedDataForCurl}'`;
 		}
@@ -369,7 +404,9 @@ export const inferSchemaFromValue = (value: any): SchemaObject => {
 
 	if (Array.isArray(value)) {
 		const itemsSchema: SchemaObject | ReferenceObject =
-			value.length > 0 ? inferSchemaFromValue(value[0]) : ({ type: 'string' } as SchemaObject);
+			value.length > 0
+				? inferSchemaFromValue(value[0])
+				: ({ type: 'string' } as SchemaObject);
 		return { type: 'array', items: itemsSchema };
 	}
 
@@ -385,9 +422,14 @@ export const inferSchemaFromValue = (value: any): SchemaObject => {
 	}
 
 	if (type === 'string') {
-		if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z?$/.test(value)) return { type: 'string', format: 'date-time' };
+		if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z?$/.test(value))
+			return { type: 'string', format: 'date-time' };
 		if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return { type: 'string', format: 'date' };
-		if (/^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$/.test(value))
+		if (
+			/^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$/.test(
+				value,
+			)
+		)
 			return { type: 'string', format: 'uuid' };
 		if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return { type: 'string', format: 'email' };
 		return { type: 'string' };
@@ -412,7 +454,7 @@ export const parseCurlToOpenApi = (
 			throw new Error('Invalid cURL command: Must start with "curl".');
 		}
 
-		const parsedCurl = curlconverter.toJsonObject(commandToParse);
+		const parsedCurl: ParsedCurlCommand = toJsonObject(commandToParse);
 		if (!parsedCurl.url && !parsedCurl.raw_url) {
 			return null;
 		}
@@ -427,8 +469,7 @@ export const parseCurlToOpenApi = (
 
 			if (!/^https?:\/\//i.test(tempUrl)) tempUrl = 'http://' + tempUrl;
 			urlObject = new URL(tempUrl);
-		}
-		catch (e) {
+		} catch (e) {
 			return null;
 		}
 
@@ -437,7 +478,7 @@ export const parseCurlToOpenApi = (
 			for (const key in parsedCurl.queries) {
 				if (Object.hasOwnProperty.call(parsedCurl.queries, key)) {
 					const values = parsedCurl.queries[key];
-					(Array.isArray(values) ? values : [values]).forEach(value => {
+					(Array.isArray(values) ? values : [values]).forEach((value) => {
 						parameters.push({
 							name: key,
 							in: 'query',
@@ -456,7 +497,11 @@ export const parseCurlToOpenApi = (
 			for (const key in parsedCurl.headers) {
 				if (Object.hasOwnProperty.call(parsedCurl.headers, key)) {
 					const lowerKey = key.toLowerCase();
-					if (!['user-agent', 'accept', 'host', 'content-length', 'cookie'].includes(lowerKey)) {
+					if (
+						!['user-agent', 'accept', 'host', 'content-length', 'cookie'].includes(
+							lowerKey,
+						)
+					) {
 						parameters.push({
 							name: key,
 							in: 'header',
@@ -467,7 +512,9 @@ export const parseCurlToOpenApi = (
 					}
 
 					if (lowerKey === 'content-type') {
-						requestContentTypeFromHeader = String(parsedCurl.headers[key]).split(';')[0].trim();
+						requestContentTypeFromHeader = String(parsedCurl.headers[key])
+							.split(';')[0]
+							.trim();
 					}
 				}
 			}
@@ -484,8 +531,7 @@ export const parseCurlToOpenApi = (
 				actualContentType = requestContentTypeFromHeader || 'application/json';
 				inferredSchema = inferSchemaFromValue(parsedCurl.data);
 				exampleValue = parsedCurl.data;
-			}
-			else if (typeof parsedCurl.data === 'string') {
+			} else if (typeof parsedCurl.data === 'string') {
 				try {
 					const jsonData = JSON.parse(parsedCurl.data);
 
@@ -493,20 +539,20 @@ export const parseCurlToOpenApi = (
 						actualContentType = requestContentTypeFromHeader || 'application/json';
 						inferredSchema = inferSchemaFromValue(jsonData);
 						exampleValue = jsonData;
-					}
-					else {
+					} else {
 						actualContentType = requestContentTypeFromHeader || 'text/plain';
 						inferredSchema = { type: 'string' };
 						exampleValue = parsedCurl.data;
 					}
-				}
-				catch (e) {
+				} catch (e) {
 					actualContentType = requestContentTypeFromHeader || 'text/plain';
 					inferredSchema = { type: 'string' };
 					exampleValue = parsedCurl.data;
 				}
 			}
-			requestBody = { content: { [actualContentType]: { schema: inferredSchema, example: exampleValue } } };
+			requestBody = {
+				content: { [actualContentType]: { schema: inferredSchema, example: exampleValue } },
+			};
 		}
 
 		const operation: OperationObject = {
@@ -524,11 +570,16 @@ export const parseCurlToOpenApi = (
 			},
 		};
 
-		return { path: urlObject.pathname, method: (parsedCurl.method || 'get').toLowerCase(), operation: operation };
-	}
-	catch (error) {
+		return {
+			path: urlObject.pathname,
+			method: (parsedCurl.method || 'get').toLowerCase(),
+			operation: operation,
+		};
+	} catch (error) {
 		if (error instanceof Error && error.message.includes('Invalid URL')) {
-			console.error('Hint: Ensure the URL in the cURL command includes a scheme (http:// or https://) or is a valid hostname.');
+			console.error(
+				'Hint: Ensure the URL in the cURL command includes a scheme (http:// or https://) or is a valid hostname.',
+			);
 		}
 
 		if (error instanceof Error && error.message.startsWith('Invalid cURL command:')) {
@@ -567,7 +618,9 @@ interface PostmanCollection {
 	variable?: Array<{ key: string; value: string; type: string; description?: string }>;
 }
 
-export const convertOpenApiToPostmanCollection = (openApiSpec: OpenAPISpec): PostmanCollection | null => {
+export const convertOpenApiToPostmanCollection = (
+	openApiSpec: OpenAPISpec,
+): PostmanCollection | null => {
 	if (!openApiSpec || !openApiSpec.info || !openApiSpec.paths) {
 		console.error('Invalid OpenAPI spec provided for Postman conversion.');
 		return null;
@@ -593,8 +646,7 @@ export const convertOpenApiToPostmanCollection = (openApiSpec: OpenAPISpec): Pos
 			type: 'string',
 			description: openApiSpec.servers[0].description || 'Main server URL',
 		});
-	}
-	else {
+	} else {
 		postmanCollection.variable?.push({
 			key: 'baseUrl',
 			value: 'YOUR_API_BASE_URL',
@@ -610,26 +662,34 @@ export const convertOpenApiToPostmanCollection = (openApiSpec: OpenAPISpec): Pos
 		const pathItemObject = pathItemUntyped as PathItemObject;
 
 		Object.entries(pathItemObject).forEach(([method, operationOrPathItemProp]) => {
-			if (!['get', 'post', 'put', 'delete', 'patch', 'options', 'head', 'trace'].includes(method.toLowerCase())) return;
+			if (
+				!['get', 'post', 'put', 'delete', 'patch', 'options', 'head', 'trace'].includes(
+					method.toLowerCase(),
+				)
+			)
+				return;
 			let operation: OperationObject | null = null;
 
 			if (typeof operationOrPathItemProp === 'object' && operationOrPathItemProp !== null) {
 				if (isRefObject(operationOrPathItemProp)) {
 					const resolvedOp = resolveRef(operationOrPathItemProp.$ref, openApiSpec);
-					if (resolvedOp && !isRefObject(resolvedOp)) operation = resolvedOp as OperationObject;
+					if (resolvedOp && !isRefObject(resolvedOp))
+						operation = resolvedOp as OperationObject;
 					else {
-						console.warn(`Could not resolve operation $ref: ${operationOrPathItemProp.$ref}`);
+						console.warn(
+							`Could not resolve operation $ref: ${operationOrPathItemProp.$ref}`,
+						);
 						return;
 					}
-				}
-				else {
+				} else {
 					operation = operationOrPathItemProp as OperationObject;
 				}
 			}
 
 			if (!operation) return;
 
-			const firstTagName = operation.tags && operation.tags.length > 0 ? operation.tags[0] : 'Default';
+			const firstTagName =
+				operation.tags && operation.tags.length > 0 ? operation.tags[0] : 'Default';
 			const requestName = operation.summary || `${method.toUpperCase()} ${path}`;
 			const postmanRequest: any = {
 				name: requestName,
@@ -649,11 +709,15 @@ export const convertOpenApiToPostmanCollection = (openApiSpec: OpenAPISpec): Pos
 				response: [],
 			};
 
-			const operationParameters = (operation.parameters || []) as (ParameterObject | ReferenceObject)[];
-			const pathItemParametersFromPathObject = (pathItemObject.parameters as (ParameterObject | ReferenceObject)[]) || [];
+			const operationParameters = (operation.parameters || []) as (
+				| ParameterObject
+				| ReferenceObject
+			)[];
+			const pathItemParametersFromPathObject =
+				(pathItemObject.parameters as (ParameterObject | ReferenceObject)[]) || [];
 			const parameterMap = new Map<string, ParameterObject>();
 
-			pathItemParametersFromPathObject.forEach(paramOrRef => {
+			pathItemParametersFromPathObject.forEach((paramOrRef) => {
 				let paramDef = paramOrRef;
 
 				if (isRefObject(paramDef)) {
@@ -669,7 +733,7 @@ export const convertOpenApiToPostmanCollection = (openApiSpec: OpenAPISpec): Pos
 					);
 			});
 
-			operationParameters.forEach(paramOrRef => {
+			operationParameters.forEach((paramOrRef) => {
 				let paramDef = paramOrRef;
 
 				if (isRefObject(paramDef)) {
@@ -687,18 +751,20 @@ export const convertOpenApiToPostmanCollection = (openApiSpec: OpenAPISpec): Pos
 
 			const combinedParameters = Array.from(parameterMap.values());
 
-			combinedParameters.forEach(p => {
+			combinedParameters.forEach((p) => {
 				let actualSchema: SchemaObject | null = null;
 
 				if (p.schema) {
 					if (isRefObject(p.schema)) {
 						const resolvedSchema = resolveRef(p.schema.$ref, openApiSpec);
-						if (resolvedSchema && !isRefObject(resolvedSchema)) actualSchema = resolvedSchema as SchemaObject;
-					}
-					else actualSchema = p.schema as SchemaObject;
+						if (resolvedSchema && !isRefObject(resolvedSchema))
+							actualSchema = resolvedSchema as SchemaObject;
+					} else actualSchema = p.schema as SchemaObject;
 				}
 
-				const exampleValue = String(p.example ?? actualSchema?.example ?? actualSchema?.default ?? '');
+				const exampleValue = String(
+					p.example ?? actualSchema?.example ?? actualSchema?.default ?? '',
+				);
 
 				const finalValue =
 					exampleValue === '' && p.in === 'path'
@@ -708,34 +774,43 @@ export const convertOpenApiToPostmanCollection = (openApiSpec: OpenAPISpec): Pos
 							: exampleValue;
 
 				if (p.in === 'header') {
-					postmanRequest.request.header.push({ key: p.name, value: finalValue, type: 'text', description: p.description || '' });
-				}
-				else if (p.in === 'query') {
+					postmanRequest.request.header.push({
+						key: p.name,
+						value: finalValue,
+						type: 'text',
+						description: p.description || '',
+					});
+				} else if (p.in === 'query') {
 					postmanRequest.request.url.query.push({
 						key: p.name,
 						value: finalValue,
 						disabled: p.deprecated,
 						description: p.description || '',
 					});
-				}
-				else if (p.in === 'path') {
+				} else if (p.in === 'path') {
 					postmanRequest.request.url.variable.push({
 						key: p.name,
 						value: exampleValue,
 						description: p.description || '',
 						type: 'string',
 					});
-					postmanRequest.request.url.raw = postmanRequest.request.url.raw.replace(`{${p.name}}`, `:${p.name}`);
-					postmanRequest.request.url.path = postmanRequest.request.url.path.map((segment: string) =>
-						segment === `{${p.name}}` ? `:${p.name}` : segment,
+					postmanRequest.request.url.raw = postmanRequest.request.url.raw.replace(
+						`{${p.name}}`,
+						`:${p.name}`,
+					);
+					postmanRequest.request.url.path = postmanRequest.request.url.path.map(
+						(segment: string) => (segment === `{${p.name}}` ? `:${p.name}` : segment),
 					);
 				}
 			});
 
 			if (postmanRequest.request.url.query.length > 0) {
 				const queryString = postmanRequest.request.url.query
-				.map((q: PostmanQueryParam) => `${encodeURIComponent(q.key)}=${encodeURIComponent(q.value || '')}`)
-				.join('&');
+					.map(
+						(q: PostmanQueryParam) =>
+							`${encodeURIComponent(q.key)}=${encodeURIComponent(q.value || '')}`,
+					)
+					.join('&');
 				postmanRequest.request.url.raw = `${postmanRequest.request.url.raw.split('?')[0]}?${queryString}`;
 			}
 
@@ -744,14 +819,19 @@ export const convertOpenApiToPostmanCollection = (openApiSpec: OpenAPISpec): Pos
 
 				if (isRefObject(operation.requestBody)) {
 					const resolved = resolveRef(operation.requestBody.$ref, openApiSpec);
-					if (resolved && !isRefObject(resolved)) reqBodyDef = resolved as RequestBodyObject;
-				}
-				else reqBodyDef = operation.requestBody as RequestBodyObject;
+					if (resolved && !isRefObject(resolved))
+						reqBodyDef = resolved as RequestBodyObject;
+				} else reqBodyDef = operation.requestBody as RequestBodyObject;
 				if (reqBodyDef && reqBodyDef.content) {
 					const jsonContent = reqBodyDef.content['application/json'];
-					const formUrlEncodedContent = reqBodyDef.content['application/x-www-form-urlencoded'];
+					const formUrlEncodedContent =
+						reqBodyDef.content['application/x-www-form-urlencoded'];
 					const formDataContent = reqBodyDef.content['multipart/form-data'];
-					const targetContent = jsonContent || formUrlEncodedContent || formDataContent || Object.values(reqBodyDef.content)[0];
+					const targetContent =
+						jsonContent ||
+						formUrlEncodedContent ||
+						formDataContent ||
+						Object.values(reqBodyDef.content)[0];
 
 					const targetContentType = jsonContent
 						? 'application/json'
@@ -764,25 +844,37 @@ export const convertOpenApiToPostmanCollection = (openApiSpec: OpenAPISpec): Pos
 					if (targetContent) {
 						let exampleForPostman: any;
 
-						if (targetContent.examples && Object.keys(targetContent.examples).length > 0) {
+						if (
+							targetContent.examples &&
+							Object.keys(targetContent.examples).length > 0
+						) {
 							const firstExampleName = Object.keys(targetContent.examples)[0];
 							const firstExampleOrRef = targetContent.examples[firstExampleName];
 
 							if (isRefObject(firstExampleOrRef)) {
-								const resolvedExampleComponent = resolveRef(firstExampleOrRef.$ref, openApiSpec);
+								const resolvedExampleComponent = resolveRef(
+									firstExampleOrRef.$ref,
+									openApiSpec,
+								);
 								exampleForPostman = resolvedExampleComponent?.value;
-							}
-							else {
+							} else {
 								exampleForPostman = firstExampleOrRef.value;
 							}
 						}
 
-						if (exampleForPostman === undefined && targetContent.example !== undefined) {
+						if (
+							exampleForPostman === undefined &&
+							targetContent.example !== undefined
+						) {
 							exampleForPostman = targetContent.example;
 						}
 
 						if (exampleForPostman === undefined && targetContent.schema) {
-							exampleForPostman = generateExampleValue(targetContent.schema, openApiSpec, { fieldName: 'requestBody' });
+							exampleForPostman = generateExampleValue(
+								targetContent.schema,
+								openApiSpec,
+								{ fieldName: 'requestBody' },
+							);
 						}
 
 						if (targetContentType && targetContentType.includes('json')) {
@@ -792,33 +884,49 @@ export const convertOpenApiToPostmanCollection = (openApiSpec: OpenAPISpec): Pos
 								options: { raw: { language: 'json' } },
 							};
 
-							if (!postmanRequest.request.header.find((h: PostmanHeader) => h.key.toLowerCase() === 'content-type')) {
-								postmanRequest.request.header.push({ key: 'Content-Type', value: 'application/json', type: 'text' });
+							if (
+								!postmanRequest.request.header.find(
+									(h: PostmanHeader) => h.key.toLowerCase() === 'content-type',
+								)
+							) {
+								postmanRequest.request.header.push({
+									key: 'Content-Type',
+									value: 'application/json',
+									type: 'text',
+								});
 							}
-						}
-						else if (
+						} else if (
 							targetContentType &&
 							targetContentType.includes('x-www-form-urlencoded') &&
 							isPlainObject(exampleForPostman)
 						) {
 							postmanRequest.request.body = {
 								mode: 'urlencoded',
-								urlencoded: Object.entries(exampleForPostman).map(([key, value]) => ({
-									key: key,
-									value: String(value),
-									type: 'text',
-								})),
+								urlencoded: Object.entries(exampleForPostman).map(
+									([key, value]) => ({
+										key: key,
+										value: String(value),
+										type: 'text',
+									}),
+								),
 							};
 
-							if (!postmanRequest.request.header.find((h: PostmanHeader) => h.key.toLowerCase() === 'content-type')) {
+							if (
+								!postmanRequest.request.header.find(
+									(h: PostmanHeader) => h.key.toLowerCase() === 'content-type',
+								)
+							) {
 								postmanRequest.request.header.push({
 									key: 'Content-Type',
 									value: 'application/x-www-form-urlencoded',
 									type: 'text',
 								});
 							}
-						}
-						else if (targetContentType && targetContentType.includes('form-data') && isPlainObject(exampleForPostman)) {
+						} else if (
+							targetContentType &&
+							targetContentType.includes('form-data') &&
+							isPlainObject(exampleForPostman)
+						) {
 							postmanRequest.request.body = {
 								mode: 'formdata',
 								formdata: Object.entries(exampleForPostman).map(([key, value]) => ({
@@ -838,10 +946,13 @@ export const convertOpenApiToPostmanCollection = (openApiSpec: OpenAPISpec): Pos
 	});
 
 	Object.entries(organizedItems).forEach(([folderName, items]) => {
-		if (items.length === 1 && folderName === 'Default' && Object.keys(organizedItems).length === 1) {
+		if (
+			items.length === 1 &&
+			folderName === 'Default' &&
+			Object.keys(organizedItems).length === 1
+		) {
 			postmanCollection.item.push(...items);
-		}
-		else {
+		} else {
 			postmanCollection.item.push({ name: folderName, item: items, _postman_id: uuidv4() });
 		}
 	});
@@ -851,7 +962,7 @@ export const convertOpenApiToPostmanCollection = (openApiSpec: OpenAPISpec): Pos
 
 const removeExtensionsRecursive = (obj: any): any => {
 	if (typeof obj !== 'object' || obj === null) return obj;
-	if (Array.isArray(obj)) return obj.map(item => removeExtensionsRecursive(item));
+	if (Array.isArray(obj)) return obj.map((item) => removeExtensionsRecursive(item));
 
 	const newObj: { [key: string]: any } = {};
 
@@ -874,8 +985,7 @@ export const sanitizeOpenApiSpecForDownload = (specObject: any): any => {
 export const safeStringify = (obj: any, indent = 2): string => {
 	try {
 		return JSON.stringify(obj, null, indent);
-	}
-	catch (error) {
+	} catch (error) {
 		console.error('Failed to stringify object', error);
 		return '[Could not display]';
 	}

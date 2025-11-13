@@ -1,38 +1,24 @@
+import type { components } from '@/types/api-types';
 import { api } from '@/utils/api';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-export interface Team {
-	id: string;
-	name: string;
-}
+type TeamDto = components['schemas']['TeamDto'];
+type CreateTeamDto = components['schemas']['CreateTeamDto'];
+type UpdateTeamDto = components['schemas']['UpdateTeamDto'];
 
 export const TEAMS_QUERY_KEY = ['teams'];
 
 export const useTeams = () => {
-	return useQuery<Team[]>({
+	return useQuery({
 		queryKey: TEAMS_QUERY_KEY,
-		queryFn: async () => {
-			const response = await api.get<Team[]>('/auth/teams');
-
-			if (response.error) {
-				throw new Error(response.error);
-			}
-
-			return response.data || [];
-		},
+		queryFn: () => api.get<TeamDto[]>('/teams'),
 	});
 };
 
 export const useCreateTeam = () => {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: async (teamName: string) => {
-			const response = await api.post<Team>('/admin/teams', { name: teamName });
-			if (response.error) {
-				throw new Error(response.error);
-			}
-			return response.data;
-		},
+		mutationFn: (teamData: CreateTeamDto) => api.post<TeamDto>('/admin/teams', teamData),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: TEAMS_QUERY_KEY });
 		},
@@ -42,15 +28,8 @@ export const useCreateTeam = () => {
 export const useUpdateTeam = () => {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: async ({ teamId, newName }: { teamId: string; newName: string }) => {
-			const response = await api.put<Team>(`/admin/teams/${teamId}`, { name: newName });
-
-			if (response.error) {
-				throw new Error(response.error);
-			}
-
-			return response.data;
-		},
+		mutationFn: ({ teamId, teamData }: { teamId: string; teamData: UpdateTeamDto }) =>
+			api.put<TeamDto>(`/admin/teams/${teamId}`, teamData),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: TEAMS_QUERY_KEY });
 		},
@@ -60,13 +39,7 @@ export const useUpdateTeam = () => {
 export const useDeleteTeam = () => {
 	const queryClient = useQueryClient();
 	return useMutation({
-		mutationFn: async (teamId: string) => {
-			const response = await api.delete(`/admin/teams/${teamId}`);
-			if (response.error) {
-				throw new Error(response.error);
-			}
-			return response.data;
-		},
+		mutationFn: (teamId: string) => api.delete<null>(`/admin/teams/${teamId}`),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: TEAMS_QUERY_KEY });
 		},

@@ -35,7 +35,8 @@ export function simpleIsEqual(a: any, b: any): boolean {
 
 		if (length !== Object.keys(b).sort().length) return false;
 
-		for (i = length; i-- !== 0; ) if (!Object.prototype.hasOwnProperty.call(b, keys[i])) return false;
+		for (i = length; i-- !== 0; )
+			if (!Object.prototype.hasOwnProperty.call(b, keys[i])) return false;
 
 		for (i = length; i-- !== 0; ) {
 			const key = keys[i];

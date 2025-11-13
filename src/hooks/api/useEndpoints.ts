@@ -6,7 +6,13 @@ export const useCreateEndpoint = () => {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: async ({ projectId, endpointData }: { projectId: string; endpointData: any }) => {
+		mutationFn: async ({
+			projectId,
+			endpointData,
+		}: {
+			projectId: string;
+			endpointData: any;
+		}) => {
 			const response = await api.post(`/projects/${projectId}/endpoints`, endpointData);
 
 			if (response.error) {
@@ -55,7 +61,10 @@ export const useUpdateEndpoint = () => {
 				apiPayload.lastKnownOperationUpdatedAt = lastKnownOperationUpdatedAt;
 			}
 
-			const response = await api.put<{ operation: OperationObject }>(`/projects/${projectId}/endpoints`, apiPayload);
+			const response = await api.put<{ operation: OperationObject }>(
+				`/projects/${projectId}/endpoints`,
+				apiPayload,
+			);
 
 			if (response.error) {
 				throw response;
@@ -74,8 +83,18 @@ export const useDeleteEndpoint = () => {
 	const queryClient = useQueryClient();
 
 	return useMutation({
-		mutationFn: async ({ projectId, path, method }: { projectId: string; path: string; method: string }) => {
-			const response = await api.delete(`/projects/${projectId}/endpoints`, { body: { path, method } });
+		mutationFn: async ({
+			projectId,
+			path,
+			method,
+		}: {
+			projectId: string;
+			path: string;
+			method: string;
+		}) => {
+			const response = await api.delete(`/projects/${projectId}/endpoints`, {
+				body: { path, method },
+			});
 
 			if (response.error) {
 				throw new Error(response.error);

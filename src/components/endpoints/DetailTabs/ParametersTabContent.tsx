@@ -9,7 +9,11 @@ interface ParametersTabContentProps {
 	paramTypeLabel: string;
 }
 
-const ParametersTabContent: React.FC<ParametersTabContentProps> = ({ parameters, openApiSpec, paramTypeLabel }) => {
+const ParametersTabContent: React.FC<ParametersTabContentProps> = ({
+	parameters,
+	openApiSpec,
+	paramTypeLabel,
+}) => {
 	if (!parameters || parameters.length === 0) {
 		return <EmptyEndpointMessage type={paramTypeLabel} />;
 	}

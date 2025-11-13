@@ -5,8 +5,22 @@ import { Button } from '@/components/ui/button';
 import { Trash2, Edit, PlusCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTeams, useCreateTeam, useUpdateTeam, useDeleteTeam } from '@/hooks/api/useTeams';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from '@/components/ui/table';
+import {
+	Dialog,
+	DialogContent,
+	DialogHeader,
+	DialogTitle,
+	DialogDescription,
+	DialogFooter,
+} from '@/components/ui/dialog';
 
 const TeamManagement = () => {
 	const { data: teams = [], isLoading } = useTeams();
@@ -26,7 +40,12 @@ const TeamManagement = () => {
 
 	const handleCreate = async () => {
 		if (!newTeamName.trim()) {
-			toast({ title: 'Error', description: 'Team name cannot be empty.', variant: 'destructive', duration: 2000 });
+			toast({
+				title: 'Error',
+				description: 'Team name cannot be empty.',
+				variant: 'destructive',
+				duration: 2000,
+			});
 			return;
 		}
 		try {
@@ -35,8 +54,7 @@ const TeamManagement = () => {
 
 			setIsCreateDialogOpen(false);
 			setNewTeamName('');
-		}
-		catch (error: any) {
+		} catch (error: any) {
 			toast({ title: 'Error', description: error.message, variant: 'destructive' });
 		}
 	};
@@ -49,7 +67,11 @@ const TeamManagement = () => {
 
 	const handleUpdate = async () => {
 		if (!editingTeam || !newTeamName.trim()) {
-			toast({ title: 'Error', description: 'Team name cannot be empty.', variant: 'destructive' });
+			toast({
+				title: 'Error',
+				description: 'Team name cannot be empty.',
+				variant: 'destructive',
+			});
 			return;
 		}
 
@@ -60,8 +82,7 @@ const TeamManagement = () => {
 			setIsEditDialogOpen(false);
 			setEditingTeam(null);
 			setNewTeamName('');
-		}
-		catch (error: any) {
+		} catch (error: any) {
 			toast({ title: 'Error', description: error.message, variant: 'destructive' });
 		}
 	};
@@ -80,8 +101,7 @@ const TeamManagement = () => {
 			toast({ title: 'Success', description: 'Team deleted successfully.' });
 			setIsDeleteDialogOpen(false);
 			setDeletingTeam(null);
-		}
-		catch (error: any) {
+		} catch (error: any) {
 			toast({ title: 'Error', description: error.message, variant: 'destructive' });
 		}
 	};
@@ -116,16 +136,25 @@ const TeamManagement = () => {
 								<TableCell colSpan={2}>No teams found.</TableCell>
 							</TableRow>
 						) : (
-							teams.map(team => (
+							teams.map((team) => (
 								<TableRow key={team.id}>
 									<TableCell className="font-medium">{team.name}</TableCell>
 
 									<TableCell className="text-right">
-										<Button variant="ghost" size="icon" onClick={() => handleEdit(team)}>
+										<Button
+											variant="ghost"
+											size="icon"
+											onClick={() => handleEdit(team)}
+										>
 											<Edit className="h-4 w-4" />
 										</Button>
 
-										<Button variant="ghost" size="icon" onClick={() => handleDelete(team)} className="text-red-500">
+										<Button
+											variant="ghost"
+											size="icon"
+											onClick={() => handleDelete(team)}
+											className="text-red-500"
+										>
 											<Trash2 className="h-4 w-4" />
 										</Button>
 									</TableCell>
@@ -143,7 +172,11 @@ const TeamManagement = () => {
 					</DialogHeader>
 
 					<div className="py-4">
-						<Input placeholder="Team name" value={newTeamName} onChange={e => setNewTeamName(e.target.value)} />
+						<Input
+							placeholder="Team name"
+							value={newTeamName}
+							onChange={(e) => setNewTeamName(e.target.value)}
+						/>
 					</div>
 
 					<DialogFooter>
@@ -165,7 +198,11 @@ const TeamManagement = () => {
 					</DialogHeader>
 
 					<div className="py-4">
-						<Input placeholder="New team name" value={newTeamName} onChange={e => setNewTeamName(e.target.value)} />
+						<Input
+							placeholder="New team name"
+							value={newTeamName}
+							onChange={(e) => setNewTeamName(e.target.value)}
+						/>
 					</div>
 
 					<DialogFooter>
@@ -186,8 +223,8 @@ const TeamManagement = () => {
 						<DialogTitle>Are you sure?</DialogTitle>
 
 						<DialogDescription className="py-1 leading-6">
-							This will permanently delete the team "{deletingTeam?.name}". This action will remove the team from all users
-							and cannot be undone.
+							This will permanently delete the team "{deletingTeam?.name}". This
+							action will remove the team from all users and cannot be undone.
 						</DialogDescription>
 					</DialogHeader>
 
@@ -196,7 +233,11 @@ const TeamManagement = () => {
 							Cancel
 						</Button>
 
-						<Button variant="destructive" onClick={confirmDelete} disabled={deleteTeamMutation.isPending}>
+						<Button
+							variant="destructive"
+							onClick={confirmDelete}
+							disabled={deleteTeamMutation.isPending}
+						>
 							{deleteTeamMutation.isPending ? 'Deleting...' : 'Delete'}
 						</Button>
 					</DialogFooter>

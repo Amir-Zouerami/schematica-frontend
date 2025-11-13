@@ -5,7 +5,14 @@ import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
 
 interface ChangePasswordModalProps {
 	isOpen: boolean;
@@ -13,7 +20,11 @@ interface ChangePasswordModalProps {
 	redirectTo?: string;
 }
 
-const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClose, redirectTo = '/login' }) => {
+const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
+	isOpen,
+	onClose,
+	redirectTo = '/login',
+}) => {
 	const { changePassword, logout } = useAuth();
 	const { toast } = useToast();
 	const navigate = useNavigate();
@@ -83,15 +94,13 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClo
 			navigate(redirectTo, { replace: true });
 
 			resetForm();
-		}
-		catch (error: any) {
+		} catch (error: any) {
 			toast({
 				title: 'Change Password Failed',
 				description: error?.message || 'An unexpected error occurred. Please try again.',
 				variant: 'destructive',
 			});
-		}
-		finally {
+		} finally {
 			setIsLoading(false);
 		}
 	};
@@ -99,7 +108,7 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClo
 	return (
 		<Dialog
 			open={isOpen}
-			onOpenChange={open => {
+			onOpenChange={(open) => {
 				if (!open) {
 					handleModalClose();
 				}
@@ -109,7 +118,8 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClo
 				<DialogHeader>
 					<DialogTitle>Change Password</DialogTitle>
 					<DialogDescription>
-						Enter your current password and choose a new password. The new password must be at least 8 characters long.
+						Enter your current password and choose a new password. The new password must
+						be at least 8 characters long.
 					</DialogDescription>
 				</DialogHeader>
 				<form onSubmit={handleSubmit} className="space-y-4 pt-2">
@@ -119,7 +129,7 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClo
 							id="currentPassword"
 							type="password"
 							value={currentPassword}
-							onChange={e => setCurrentPassword(e.target.value)}
+							onChange={(e) => setCurrentPassword(e.target.value)}
 							required
 							disabled={isLoading}
 							autoComplete="current-password"
@@ -131,7 +141,7 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClo
 							id="newPassword"
 							type="password"
 							value={newPassword}
-							onChange={e => setNewPassword(e.target.value)}
+							onChange={(e) => setNewPassword(e.target.value)}
 							required
 							disabled={isLoading}
 							autoComplete="new-password"
@@ -143,14 +153,19 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClo
 							id="confirmPassword"
 							type="password"
 							value={confirmPassword}
-							onChange={e => setConfirmPassword(e.target.value)}
+							onChange={(e) => setConfirmPassword(e.target.value)}
 							required
 							disabled={isLoading}
 							autoComplete="new-password"
 						/>
 					</div>
 					<DialogFooter className="mt-6">
-						<Button type="button" variant="outline" onClick={handleModalClose} disabled={isLoading}>
+						<Button
+							type="button"
+							variant="outline"
+							onClick={handleModalClose}
+							disabled={isLoading}
+						>
 							Cancel
 						</Button>
 						<Button type="submit" disabled={isLoading}>

@@ -1,9 +1,15 @@
 import { useToast } from '@/hooks/use-toast';
-import { AuthState, User } from '../types/types';
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import type { components } from '@/types/api-types';
+import { api, ApiError } from '@/utils/api';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
-interface AuthContextType extends Omit<AuthState, 'user'> {
+type User = components['schemas']['UserDto'];
+type ChangePasswordDto = components['schemas']['ChangePasswordDto'];
+
+interface AuthContextType {
 	user: User | null;
+	isAuthenticated: boolean;
+	isLoading: boolean;
 	login: (username: string, password: string) => Promise<void>;
 	logout: () => void;
 	changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
@@ -12,178 +18,102 @@ interface AuthContextType extends Omit<AuthState, 'user'> {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-	const [authState, setAuthState] = useState<AuthContextType>({
-		user: null,
-		isAuthenticated: false,
-		isLoading: true,
-		login: async () => {},
-		logout: () => {},
-		changePassword: async () => {},
-	});
-
+	const [user, setUser] = useState<User | null>(null);
+	const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+	const [isLoading, setIsLoading] = useState<boolean>(true);
 	const { toast } = useToast();
 
 	const performLogout = useCallback(() => {
 		localStorage.removeItem('token');
-
-		setAuthState(prev => ({
-			...prev,
-			user: null,
-			isAuthenticated: false,
-			isLoading: false,
-		}));
+		setUser(null);
+		setIsAuthenticated(false);
 	}, []);
 
 	useEffect(() => {
-		const checkAuth = async () => {
-			try {
-				const token = localStorage.getItem('token');
-
-				if (!token) {
-					setAuthState(prev => ({
-						...prev,
-						user: null,
-						isAuthenticated: false,
-						isLoading: false,
-					}));
-
-					return;
-				}
-
-				const response = await fetch(`/api/auth/me`, {
-					headers: {
-						Authorization: `Bearer ${token}`,
-					},
-				});
-
-				if (response.ok) {
-					const data = await response.json();
-
-					setAuthState(prev => ({
-						...prev,
-						user: data.user as User,
-						isAuthenticated: true,
-						isLoading: false,
-					}));
-				}
-				else if (response.status === 401 || response.status === 403) {
-					performLogout();
-				}
-				else {
-					setAuthState(prev => ({
-						...prev,
-						isLoading: false,
-					}));
-				}
+		const checkAuthStatus = async () => {
+			const token = localStorage.getItem('token');
+			if (!token) {
+				setIsLoading(false);
+				return;
 			}
-			catch (error) {
-				setAuthState(prev => ({
-					...prev,
-					isLoading: false,
-				}));
+
+			try {
+				const response = await api.get<User>('/auth/me');
+				setUser(response.data);
+				setIsAuthenticated(true);
+			} catch (error) {
+				performLogout();
+			} finally {
+				setIsLoading(false);
 			}
 		};
 
-		checkAuth();
+		checkAuthStatus();
 	}, [performLogout]);
 
-	const login = async (username: string, password: string) => {
+	const login = async (username, password) => {
+		setIsLoading(true);
 		try {
-			const response = await fetch(`/api/auth/login`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({ username, password }),
+			// Step 1: Log in to get the access token.
+			const loginResponse = await api.post<{ access_token: string }>('/auth/login', {
+				username,
+				password,
 			});
+			const token = loginResponse.data.access_token;
+			localStorage.setItem('token', token);
 
-			const data = await response.json();
+			// Step 2: Immediately fetch the user profile with the new token.
+			const profileResponse = await api.get<User>('/auth/me');
+			setUser(profileResponse.data);
+			setIsAuthenticated(true);
 
-			if (response.ok) {
-				localStorage.setItem('token', data.token);
-
-				setAuthState(prev => ({
-					...prev,
-					user: data.user as User,
-					isAuthenticated: true,
-					isLoading: false,
-				}));
-
-				toast({
-					title: 'Login successful',
-					description: `Welcome back, ${data.user.username}!`,
-					duration: 2000,
-				});
-			}
-			else {
-				toast({
-					title: 'Login failed',
-					description: data.message || 'Invalid credentials',
-					variant: 'destructive',
-				});
-
-				throw new Error(data.message || 'Login failed');
-			}
-		}
-		catch (error) {
-			setAuthState(prev => ({ ...prev, isLoading: false }));
+			toast({
+				title: 'Login successful',
+				description: `Welcome back, ${profileResponse.data.username}!`,
+				duration: 2000,
+			});
+		} catch (error) {
+			const errorMessage =
+				error instanceof ApiError ? error.message : 'Login failed. Please try again.';
+			toast({
+				title: 'Login failed',
+				description: errorMessage,
+				variant: 'destructive',
+			});
+			// Re-throw the error so the calling component (LoginForm) can handle its own state.
 			throw error;
+		} finally {
+			setIsLoading(false);
 		}
 	};
+
+	const logout = useCallback(() => {
+		performLogout();
+		toast({
+			title: 'Logged out',
+			description: 'You have been successfully logged out.',
+		});
+	}, [performLogout, toast]);
 
 	const changePassword = async (currentPassword: string, newPassword: string) => {
 		try {
-			const token = localStorage.getItem('token');
-
-			if (!token) {
-				throw new Error('No token found. Please log in again.');
-			}
-
-			const response = await fetch(`/api/auth/change-password`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${token}`,
-				},
-				body: JSON.stringify({ currentPassword, newPassword }),
-			});
-
-			const data = await response.json();
-
-			if (!response.ok) {
-				toast({
-					title: 'Password change failed',
-					description: data.message || 'Failed to change password',
-					variant: 'destructive',
-				});
-
-				throw new Error(data.message || 'Password change failed');
-			}
-		}
-		catch (error) {
-			if ((error as Error).message.includes('No token found')) {
+			const payload: ChangePasswordDto = { currentPassword, newPassword };
+			await api.post('/users/change-password', payload);
+		} catch (error) {
+			if (error instanceof ApiError && error.status === 401) {
 				performLogout();
 			}
-
+			// Re-throw so the modal can display the specific error message and handle its state.
 			throw error;
 		}
-	};
-
-	const logout = () => {
-		performLogout();
-
-		toast({
-			title: 'Logged out',
-			description: 'You have been successfully logged out',
-		});
 	};
 
 	return (
 		<AuthContext.Provider
 			value={{
-				user: authState.user,
-				isAuthenticated: authState.isAuthenticated,
-				isLoading: authState.isLoading,
+				user,
+				isAuthenticated,
+				isLoading,
 				login,
 				logout,
 				changePassword,
@@ -196,10 +126,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useAuth = () => {
 	const context = useContext(AuthContext);
-
 	if (!context) {
 		throw new Error('useAuth must be used within an AuthProvider');
 	}
-
 	return context;
 };

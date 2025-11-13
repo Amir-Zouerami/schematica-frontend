@@ -1,4 +1,10 @@
-import { OpenAPISpec, SchemaObject, ReferenceObject, MediaTypeObject, RequestBodyObject } from '@/types/types';
+import {
+	OpenAPISpec,
+	SchemaObject,
+	ReferenceObject,
+	MediaTypeObject,
+	RequestBodyObject,
+} from '@/types/types';
 
 export const isRefObject = (obj: any): obj is ReferenceObject => {
 	return obj && typeof obj === 'object' && obj !== null && '$ref' in obj;
@@ -15,8 +21,7 @@ export const resolveRef = (ref: string, openApiSpec: OpenAPISpec): any | null =>
 	for (const segment of path) {
 		if (current && typeof current === 'object' && segment in current) {
 			current = current[segment];
-		}
-		else {
+		} else {
 			return null;
 		}
 	}
@@ -49,14 +54,20 @@ export const deeplyResolveReferences = <T extends object | any[]>(
 	}
 
 	if (Array.isArray(input)) {
-		return input.map(item => deeplyResolveReferences(item, openApiSpec, new Set(visitedRefs))) as any;
+		return input.map((item) =>
+			deeplyResolveReferences(item, openApiSpec, new Set(visitedRefs)),
+		) as any;
 	}
 
 	const result: any = {};
 
 	for (const key in input) {
 		if (Object.prototype.hasOwnProperty.call(input, key)) {
-			result[key] = deeplyResolveReferences((input as any)[key], openApiSpec, new Set(visitedRefs));
+			result[key] = deeplyResolveReferences(
+				(input as any)[key],
+				openApiSpec,
+				new Set(visitedRefs),
+			);
 		}
 	}
 
@@ -75,13 +86,11 @@ export const resolveRequestBody = (
 
 		if (resolved && !isRefObject(resolved)) {
 			directRequestBody = resolved as RequestBodyObject;
-		}
-		else {
+		} else {
 			console.warn(`Could not resolve RequestBody $ref: ${requestBodyOrRef.$ref}`);
 			return null;
 		}
-	}
-	else {
+	} else {
 		directRequestBody = requestBodyOrRef;
 	}
 
@@ -94,14 +103,20 @@ export const resolveRequestBody = (
 	for (const contentType in directRequestBody.content) {
 		if (Object.prototype.hasOwnProperty.call(directRequestBody.content, contentType)) {
 			const mediaType = directRequestBody.content[contentType];
-			resolvedContent[contentType] = deeplyResolveReferences<MediaTypeObject>(mediaType, openApiSpec);
+			resolvedContent[contentType] = deeplyResolveReferences<MediaTypeObject>(
+				mediaType,
+				openApiSpec,
+			);
 		}
 	}
 
 	return { ...directRequestBody, content: resolvedContent };
 };
 
-export const getTypeString = (schema: SchemaObject | ReferenceObject, openApiSpec: OpenAPISpec): string => {
+export const getTypeString = (
+	schema: SchemaObject | ReferenceObject,
+	openApiSpec: OpenAPISpec,
+): string => {
 	const resolvedSchemaInput = isRefObject(schema) ? resolveRef(schema.$ref, openApiSpec) : schema;
 
 	if (
@@ -123,18 +138,15 @@ export const getTypeString = (schema: SchemaObject | ReferenceObject, openApiSpe
 
 	if (resolvedSchema.enum) {
 		typeString = `${resolvedSchema.type || 'string'} (enum)`;
-	}
-	else if (typeString === 'array' && resolvedSchema.items) {
+	} else if (typeString === 'array' && resolvedSchema.items) {
 		const itemSchema = resolvedSchema.items;
 
 		if (isRefObject(itemSchema)) {
 			const refParts = itemSchema.$ref.split('/');
 			typeString = `array[${refParts[refParts.length - 1] || 'reference'}]`;
-		}
-		else if (itemSchema && typeof itemSchema === 'object' && 'type' in itemSchema) {
+		} else if (itemSchema && typeof itemSchema === 'object' && 'type' in itemSchema) {
 			typeString = `array[${(itemSchema as SchemaObject).type || 'unknown_item'}]`;
-		}
-		else {
+		} else {
 			typeString = `array[unknown_item_format]`;
 		}
 	}
@@ -142,7 +154,10 @@ export const getTypeString = (schema: SchemaObject | ReferenceObject, openApiSpe
 	return typeString;
 };
 
-export const getResolvedSchemaJson = (schema: SchemaObject | ReferenceObject, openApiSpec: OpenAPISpec): string => {
+export const getResolvedSchemaJson = (
+	schema: SchemaObject | ReferenceObject,
+	openApiSpec: OpenAPISpec,
+): string => {
 	try {
 		const fullyResolvedSchema = deeplyResolveReferences(schema, openApiSpec);
 
@@ -151,8 +166,7 @@ export const getResolvedSchemaJson = (schema: SchemaObject | ReferenceObject, op
 		}
 
 		return JSON.stringify(fullyResolvedSchema, null, 2);
-	}
-	catch (error) {
+	} catch (error) {
 		console.error('Failed to fully resolve schema (exception):', error);
 		return JSON.stringify(schema, null, 2);
 	}
@@ -174,8 +188,7 @@ export const formatDate = (dateString?: string): string => {
 			hour: '2-digit',
 			minute: '2-digit',
 		});
-	}
-	catch (e) {
+	} catch (e) {
 		return 'Invalid date';
 	}
 };
@@ -187,7 +200,11 @@ export const getRefName = (ref: string | undefined): string | null => {
 
 export const shouldShowPropertiesTable = (schema: SchemaObject): boolean => {
 	return (
-		schema && typeof schema === 'object' && schema.type === 'object' && !!schema.properties && Object.keys(schema.properties).length > 0
+		schema &&
+		typeof schema === 'object' &&
+		schema.type === 'object' &&
+		!!schema.properties &&
+		Object.keys(schema.properties).length > 0
 	);
 };
 

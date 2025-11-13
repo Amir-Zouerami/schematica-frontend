@@ -1,31 +1,45 @@
+/* Optional Google Font import */
 /* @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap'); */
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.ts";
+
+/* ----------------------------- */
+/*           BASE LAYER          */
+/* ----------------------------- */
 
 @layer base {
 	:root {
 		--background: 240 10% 3.9%;
 		--foreground: 0 0% 98%;
+
 		--card: 240 10% 3.9%;
 		--card-foreground: 0 0% 98%;
+
 		--popover: 240 10% 3.9%;
 		--popover-foreground: 0 0% 98%;
+
 		--primary: 0 0% 98%;
 		--primary-foreground: 240 5.9% 10%;
+
 		--secondary: 240 3.7% 15.9%;
 		--secondary-foreground: 0 0% 98%;
+
 		--muted: 240 3.7% 15.9%;
 		--muted-foreground: 240 5% 64.9%;
+
 		--accent: 240 3.7% 15.9%;
 		--accent-foreground: 0 0% 98%;
+
 		--destructive: 0 62.8% 30.6%;
 		--destructive-foreground: 0 0% 98%;
+
 		--border: 240 3.7% 15.9%;
 		--input: 240 3.7% 15.9%;
 		--ring: 240 4.9% 83.9%;
+
 		--radius: 0.5rem;
+
 		--sidebar-background: 240 10% 3.9%;
 		--sidebar-foreground: 0 0% 98%;
 		--sidebar-primary: 217.2 91.2% 59.8%;
@@ -38,9 +52,13 @@
 }
 
 @layer base {
+	/* ----------------------------- */
+	/*           FONTS               */
+	/* ----------------------------- */
+
 	@font-face {
 		font-family: 'JetBrains Mono';
-		src: url('/fonts/JetBrainsMonoNLNerdFont-Thin.ttf') format('trueType');
+		src: url('/fonts/JetBrainsMonoNLNerdFont-Thin.ttf') format('truetype');
 		font-weight: 300;
 		font-style: normal;
 		font-display: swap;
@@ -48,7 +66,7 @@
 
 	@font-face {
 		font-family: 'JetBrains Mono';
-		src: url('/fonts/JetBrainsMonoNerdFontMono-Regular.ttf') format('trueType');
+		src: url('/fonts/JetBrainsMonoNerdFontMono-Regular.ttf') format('truetype');
 		font-weight: 500;
 		font-style: normal;
 		font-display: swap;
@@ -56,7 +74,7 @@
 
 	@font-face {
 		font-family: 'JetBrains Mono';
-		src: url('/fonts/JetBrainsMonoNerdFont-SemiBold.ttf') format('trueType');
+		src: url('/fonts/JetBrainsMonoNerdFont-SemiBold.ttf') format('truetype');
 		font-weight: 600;
 		font-style: normal;
 		font-display: swap;
@@ -64,7 +82,7 @@
 
 	@font-face {
 		font-family: 'JetBrains Mono';
-		src: url('/fonts/JetBrainsMonoNerdFontMono-Bold.ttf') format('trueType');
+		src: url('/fonts/JetBrainsMonoNerdFontMono-Bold.ttf') format('truetype');
 		font-weight: 700;
 		font-style: normal;
 		font-display: swap;
@@ -72,7 +90,7 @@
 
 	@font-face {
 		font-family: 'JetBrains Mono';
-		src: url('/fonts/JetBrainsMonoNerdFont-ExtraBold.ttf') format('trueType');
+		src: url('/fonts/JetBrainsMonoNerdFont-ExtraBold.ttf') format('truetype');
 		font-weight: 800;
 		font-style: normal;
 		font-display: swap;
@@ -80,12 +98,16 @@
 
 	@font-face {
 		font-family: 'NotoSans Arabic';
-		src: url('/fonts/NotoSansArabic-Regular.ttf') format('trueType');
+		src: url('/fonts/NotoSansArabic-Regular.ttf') format('truetype');
 		font-weight: 500;
 		font-style: normal;
 		font-display: swap;
 		unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 	}
+
+	/* ----------------------------- */
+	/*          BASE RULES           */
+	/* ----------------------------- */
 
 	* {
 		@apply border-border selection:bg-white/10 selection:text-white;
@@ -95,7 +117,14 @@
 		@apply bg-background text-foreground antialiased;
 		font-feature-settings: 'ss01', 'ss02', 'cv01', 'cv02', 'cv03';
 		scroll-behavior: smooth;
-		font-family: ui-sans-serif, system-ui, sans-serif, 'NotoSans Arabic', 'Apple Color Emoji', 'Segoe UI Emoji', Segoe UI Symbol,
+		font-family:
+			ui-sans-serif,
+			system-ui,
+			sans-serif,
+			'NotoSans Arabic',
+			'Apple Color Emoji',
+			'Segoe UI Emoji',
+			Segoe UI Symbol,
 			'Noto Color Emoji';
 	}
 
@@ -110,11 +139,16 @@
 	}
 }
 
+/* ----------------------------- */
+/*        COMPONENTS LAYER       */
+/* ----------------------------- */
+
 @layer components {
 	.glass-card {
 		@apply bg-secondary/30 backdrop-blur-sm border border-border rounded-lg shadow-lg;
 	}
 
+	/* Gradient utilities */
 	.text-gradient {
 		@apply bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent;
 	}
@@ -192,6 +226,10 @@
 	}
 }
 
+/* ----------------------------- */
+/*        MISC ELEMENTS          */
+/* ----------------------------- */
+
 [data-state='open'] {
 	animation: scrollIntoView 0.1s ease-out;
 }
@@ -218,6 +256,7 @@
 	animation-duration: 200ms;
 }
 
+/* Scrollbar styling */
 ::-webkit-scrollbar {
 	width: 10px;
 	height: 10px;
@@ -244,6 +283,7 @@ html {
 	scroll-behavior: smooth;
 }
 
+/* Unicode fix for RTL/LTR input issues */
 input,
 .input,
 textarea,

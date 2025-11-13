@@ -8,7 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import React, { useState, useEffect, useRef } from 'react';
 import { useCreateProject, useUpdateProject } from '@/hooks/api/useProjects';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
 
 import {
 	AlertDialog,
@@ -48,7 +55,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 
 	const [lastKnownUpdatedAt, setLastKnownUpdatedAt] = useState<string | undefined>(undefined);
 	const [conflictError, setConflictError] = useState<string | null>(null);
-	const [serverVersionTimestamp, setServerVersionTimestamp] = useState<string | undefined>(undefined);
+	const [serverVersionTimestamp, setServerVersionTimestamp] = useState<string | undefined>(
+		undefined,
+	);
 
 	const populateFormFields = (currentProjectData: Project | undefined) => {
 		setName(currentProjectData?.name || '');
@@ -81,8 +90,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 				setConflictError(null);
 				setServerVersionTimestamp(undefined);
 			}
-		}
-		else {
+		} else {
 			if (!conflictError) {
 				hasInitializedFromProps.current = false;
 				currentProjectIdentifier.current = null;
@@ -91,11 +99,11 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 	}, [project, open, conflictError]);
 
 	const handleAddLink = () => {
-		setLinks(prevLinks => [...prevLinks, { name: '', url: '' }]);
+		setLinks((prevLinks) => [...prevLinks, { name: '', url: '' }]);
 	};
 
 	const handleLinkChange = (index: number, field: 'name' | 'url', value: string) => {
-		setLinks(prevLinks => {
+		setLinks((prevLinks) => {
 			const newLinks = [...prevLinks];
 			newLinks[index] = { ...newLinks[index], [field]: value };
 
@@ -104,14 +112,18 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 	};
 
 	const handleRemoveLink = (index: number) => {
-		setLinks(prevLinks => prevLinks.filter((_, i) => i !== index));
+		setLinks((prevLinks) => prevLinks.filter((_, i) => i !== index));
 	};
 
 	const handleSubmit = async (e?: React.FormEvent, forceOverwrite = false) => {
 		if (e) e.preventDefault();
 
 		if (!name.trim()) {
-			toast({ title: 'Validation Error', description: 'Project name is required', variant: 'destructive' });
+			toast({
+				title: 'Validation Error',
+				description: 'Project name is required',
+				variant: 'destructive',
+			});
 			return;
 		}
 
@@ -120,7 +132,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 			setServerVersionTimestamp(undefined);
 		}
 
-		const filteredLinks = links.filter(link => link.name.trim() && link.url.trim());
+		const filteredLinks = links.filter((link) => link.name.trim() && link.url.trim());
 		const payload: any = {
 			name,
 			description,
@@ -134,31 +146,40 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 
 		try {
 			if (project) {
-				await updateProjectMutation.mutateAsync({ projectId: project.id, projectData: payload });
-			}
-			else {
+				await updateProjectMutation.mutateAsync({
+					projectId: project.id,
+					projectData: payload,
+				});
+			} else {
 				await createProjectMutation.mutateAsync(payload);
 			}
 
 			toast({
-				title: project ? (forceOverwrite ? 'Project Overwritten' : 'Project Updated') : 'Project Created',
+				title: project
+					? forceOverwrite
+						? 'Project Overwritten'
+						: 'Project Updated'
+					: 'Project Created',
 				description: project
 					? `${name} has been successfully ${forceOverwrite ? 'overwritten' : 'updated'}`
 					: `${name} has been successfully created`,
 			});
 
 			onClose();
-		}
-		catch (error: any) {
+		} catch (error: any) {
 			if (error?.status === 409 && project) {
 				setServerVersionTimestamp(error.errorData?.serverUpdatedAt);
-				setConflictError(error.error || 'This project was updated by someone else. Please review.');
+				setConflictError(
+					error.error || 'This project was updated by someone else. Please review.',
+				);
 				return;
 			}
 
 			toast({
 				title: 'Error',
-				description: error?.error || (error instanceof Error ? error.message : 'Failed to save project'),
+				description:
+					error?.error ||
+					(error instanceof Error ? error.message : 'Failed to save project'),
 				variant: 'destructive',
 			});
 		}
@@ -172,7 +193,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 		if (!project?.id) return;
 
 		const tempSubmittingStateSetter = (val: boolean) =>
-			((updateProjectMutation.isPending as any) = (createProjectMutation.isPending as any) = val);
+			((updateProjectMutation.isPending as any) = (createProjectMutation.isPending as any) =
+				val);
 
 		tempSubmittingStateSetter(true);
 		setConflictError(null);
@@ -188,21 +210,23 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 
 				toast({
 					title: 'Data Refreshed',
-					description: 'Form has been updated with the latest server data. Your previous edits were discarded.',
+					description:
+						'Form has been updated with the latest server data. Your previous edits were discarded.',
 				});
-			}
-			else {
+			} else {
 				toast({
 					title: 'Refresh Failed',
 					description: response.error || 'Could not fetch latest project data.',
 					variant: 'destructive',
 				});
 			}
-		}
-		catch (error) {
-			toast({ title: 'Refresh Failed', description: (error as Error).message, variant: 'destructive' });
-		}
-		finally {
+		} catch (error) {
+			toast({
+				title: 'Refresh Failed',
+				description: (error as Error).message,
+				variant: 'destructive',
+			});
+		} finally {
 			tempSubmittingStateSetter(false);
 		}
 	};
@@ -211,7 +235,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 		setConflictError(null);
 		toast({
 			title: 'Conflict Noted',
-			description: 'Your edits are still in the form. Please review or copy them before proceeding.',
+			description:
+				'Your edits are still in the form. Please review or copy them before proceeding.',
 			duration: 7000,
 		});
 	};
@@ -220,7 +245,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 		<>
 			<Dialog
 				open={open}
-				onOpenChange={isOpenDialog => {
+				onOpenChange={(isOpenDialog) => {
 					if (!isOpenDialog) {
 						if (!isSubmitting) {
 							onClose();
@@ -230,7 +255,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 			>
 				<DialogContent className="max-w-3xl glass-card">
 					<DialogHeader>
-						<DialogTitle className="text-gradient">{project ? 'Edit Project' : 'Create New Project'}</DialogTitle>
+						<DialogTitle className="text-gradient">
+							{project ? 'Edit Project' : 'Create New Project'}
+						</DialogTitle>
 						<DialogDescription>
 							{project
 								? 'Update the details of your API documentation project'
@@ -244,7 +271,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 							<Input
 								id="name"
 								value={name}
-								onChange={e => setName(e.target.value)}
+								onChange={(e) => setName(e.target.value)}
 								placeholder="My API Project"
 								required
 								disabled={isSubmitting}
@@ -256,7 +283,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 							<Textarea
 								id="description"
 								value={description}
-								onChange={e => setDescription(e.target.value)}
+								onChange={(e) => setDescription(e.target.value)}
 								placeholder="A brief description of your API project"
 								rows={3}
 								disabled={isSubmitting}
@@ -268,7 +295,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 							<Input
 								id="serverUrl"
 								value={serverUrl}
-								onChange={e => setServerUrl(e.target.value)}
+								onChange={(e) => setServerUrl(e.target.value)}
 								placeholder="https://api.example.com"
 								disabled={isSubmitting}
 							/>
@@ -277,7 +304,13 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 						<div className="space-y-2">
 							<div className="flex justify-between items-center mb-2">
 								<Label>Related Links</Label>
-								<Button type="button" variant="outline" size="sm" onClick={handleAddLink} disabled={isSubmitting}>
+								<Button
+									type="button"
+									variant="outline"
+									size="sm"
+									onClick={handleAddLink}
+									disabled={isSubmitting}
+								>
 									Add Link
 								</Button>
 							</div>
@@ -286,7 +319,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 									<Input
 										placeholder="Name (e.g., Staging ENV)"
 										value={link.name}
-										onChange={e => handleLinkChange(index, 'name', e.target.value)}
+										onChange={(e) =>
+											handleLinkChange(index, 'name', e.target.value)
+										}
 										className="flex-1"
 										disabled={isSubmitting}
 									/>
@@ -294,7 +329,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 									<Input
 										placeholder="URL (e.g., https://staging.api.com)"
 										value={link.url}
-										onChange={e => handleLinkChange(index, 'url', e.target.value)}
+										onChange={(e) =>
+											handleLinkChange(index, 'url', e.target.value)
+										}
 										className="flex-1"
 										disabled={isSubmitting}
 									/>
@@ -312,16 +349,31 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 								</div>
 							))}
 
-							{links.length === 0 && <p className="text-xs text-muted-foreground text-center">No related links added.</p>}
+							{links.length === 0 && (
+								<p className="text-xs text-muted-foreground text-center">
+									No related links added.
+								</p>
+							)}
 						</div>
 
 						<DialogFooter className="pt-4">
-							<Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+							<Button
+								type="button"
+								variant="outline"
+								onClick={onClose}
+								disabled={isSubmitting}
+							>
 								Cancel
 							</Button>
 
 							<Button type="submit" disabled={isSubmitting || !!conflictError}>
-								{isSubmitting ? (project ? 'Updating...' : 'Creating...') : project ? 'Update Project' : 'Create Project'}
+								{isSubmitting
+									? project
+										? 'Updating...'
+										: 'Creating...'
+									: project
+										? 'Update Project'
+										: 'Create Project'}
 							</Button>
 						</DialogFooter>
 					</form>
@@ -331,7 +383,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 			{conflictError && (
 				<AlertDialog
 					open={!!conflictError}
-					onOpenChange={isOpenDialog => {
+					onOpenChange={(isOpenDialog) => {
 						if (!isOpenDialog) {
 							setConflictError(null);
 						}
@@ -346,29 +398,46 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 									{serverVersionTimestamp && (
 										<>
 											<p>
-												<strong>Last server update EN:</strong> {new Date(serverVersionTimestamp).toLocaleString()}
+												<strong>Last server update EN:</strong>{' '}
+												{new Date(serverVersionTimestamp).toLocaleString()}
 											</p>
 											<p>
 												<strong>Last server update FA:</strong>{' '}
-												{new Date(serverVersionTimestamp).toLocaleString('fa-IR')}
+												{new Date(serverVersionTimestamp).toLocaleString(
+													'fa-IR',
+												)}
 											</p>
 										</>
 									)}
-									<p className="mt-2">Your current unsaved edits are still in the form.</p>
+									<p className="mt-2">
+										Your current unsaved edits are still in the form.
+									</p>
 								</div>
 							</AlertDialogDescription>
 						</AlertDialogHeader>
 
 						<AlertDialogFooter className="flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2 mt-2">
-							<Button className="w-full sm:w-auto" variant="outline" onClick={handleCloseConflictDialogOnly}>
+							<Button
+								className="w-full sm:w-auto"
+								variant="outline"
+								onClick={handleCloseConflictDialogOnly}
+							>
 								<X className="mr-2 h-4 w-4" /> Review My Edits
 							</Button>
 
-							<Button className="w-full sm:w-auto" variant="secondary" onClick={handleRefreshAndDiscardEdits}>
+							<Button
+								className="w-full sm:w-auto"
+								variant="secondary"
+								onClick={handleRefreshAndDiscardEdits}
+							>
 								<RefreshCw className="mr-2 h-4 w-4" /> Refresh & Discard My Edits
 							</Button>
 
-							<Button className="w-full sm:w-auto" variant="destructive" onClick={handleForceSubmitFromDialog}>
+							<Button
+								className="w-full sm:w-auto"
+								variant="destructive"
+								onClick={handleForceSubmitFromDialog}
+							>
 								Force Overwrite With My Edits
 							</Button>
 						</AlertDialogFooter>

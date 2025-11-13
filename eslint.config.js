@@ -1,31 +1,63 @@
+// @ts-check
+
 import js from '@eslint/js';
-import globals from 'globals';
-import tseslint from 'typescript-eslint';
 import stylistic from '@stylistic/eslint-plugin';
+import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
+import { defineConfig } from 'eslint/config';
+import globals from 'globals';
+import tseslint from 'typescript-eslint';
 
-export default tseslint.config(
-	{ ignores: ['dist', 'src/components/ui/**'] },
+export default defineConfig([
 	{
-		extends: [js.configs.recommended, ...tseslint.configs.recommended],
+		ignores: ['dist', 'src/components/ui/**'],
+	},
+
+	{
 		files: ['**/*.{ts,tsx}'],
+
 		languageOptions: {
-			ecmaVersion: 2020,
+			parser: tseslint.parser,
+			parserOptions: {
+				ecmaVersion: 2020,
+				sourceType: 'module',
+				ecmaFeatures: { jsx: true },
+			},
 			globals: globals.browser,
 		},
+
+		extends: [
+			js.configs.recommended,
+			...tseslint.configs.recommended,
+			reactHooks.configs.recommended,
+			eslintPluginPrettierRecommended,
+		],
+
 		plugins: {
 			'@stylistic': stylistic,
-			'react-hooks': reactHooks,
 			'react-refresh': reactRefresh,
 		},
+
 		rules: {
-			...reactHooks.configs.recommended.rules,
 			'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
-			'@typescript-eslint/no-unused-vars': 'off',
+
 			'@typescript-eslint/no-explicit-any': 'off',
+
 			'@stylistic/brace-style': ['error', 'stroustrup', { allowSingleLine: false }],
-			'@stylistic/indent': ['error', 'tab', { SwitchCase: 1, MemberExpression: 0 }],
+
+			'@stylistic/indent': 'off',
+
+			'prettier/prettier': ['error', { endOfLine: 'auto' }],
+
+			'@typescript-eslint/no-unused-vars': [
+				'error',
+				{
+					argsIgnorePattern: '^_',
+					varsIgnorePattern: '^_',
+					caughtErrorsIgnorePattern: '^_',
+				},
+			],
 		},
 	},
-);
+]);

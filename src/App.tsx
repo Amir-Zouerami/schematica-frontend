@@ -31,7 +31,10 @@ const App = () => {
 								<Route element={<ProtectedRoute />}>
 									<Route element={<Layout />}>
 										<Route path="/" element={<ProjectsPage />} />
-										<Route path="/projects/:projectId" element={<ProjectDetailPage />} />
+										<Route
+											path="/projects/:projectId"
+											element={<ProjectDetailPage />}
+										/>
 										<Route element={<AdminRoute />}>
 											<Route path="/admin" element={<AdminPage />} />
 										</Route>

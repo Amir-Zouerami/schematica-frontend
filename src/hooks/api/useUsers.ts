@@ -1,26 +1,15 @@
+import type { components } from '@/types/api-types';
 import { api } from '@/utils/api';
 import { useQuery } from '@tanstack/react-query';
 
-export interface SanitizedUser {
-	id: string;
-	username: string;
-	profileImage?: string;
-}
+type SanitizedUserDto = components['schemas']['SanitizedUserDto'];
 
 export const USERS_QUERY_KEY = ['users'];
 
 export const useUsers = () => {
-	return useQuery<SanitizedUser[]>({
+	return useQuery({
 		queryKey: USERS_QUERY_KEY,
-		queryFn: async () => {
-			const response = await api.get<SanitizedUser[]>('/auth/users');
-
-			if (response.error) {
-				throw new Error(response.error);
-			}
-
-			return response.data || [];
-		},
+		queryFn: () => api.get<SanitizedUserDto[]>(`/users`),
 		staleTime: 1000 * 60 * 5,
 	});
 };

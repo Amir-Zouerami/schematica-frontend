@@ -27,7 +27,7 @@ export const usePermissions = () => {
 			return true;
 		}
 
-		if (user.teams?.some(team => project.access?.owners.teams.includes(team))) {
+		if (user.teams?.some((team) => project.access?.owners.teams.includes(team))) {
 			return true;
 		}
 

@@ -4,8 +4,21 @@ import { Input } from '@/components/ui/input';
 import { ParameterObject } from '@/types/types';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from '@/components/ui/table';
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from '@/components/ui/select';
 
 export interface ManagedParameterUI extends ParameterObject {
 	_id: string;
@@ -15,7 +28,11 @@ interface FormParametersSectionProps {
 	parameters: ManagedParameterUI[];
 	onAddParameter: (paramType: 'path' | 'query' | 'header') => void;
 	onRemoveParameter: (id: string) => void;
-	onUpdateParameter: (id: string, field: keyof Omit<ManagedParameterUI, '_id'>, value: any) => void;
+	onUpdateParameter: (
+		id: string,
+		field: keyof Omit<ManagedParameterUI, '_id'>,
+		value: any,
+	) => void;
 	isSubmittingForm: boolean;
 }
 
@@ -32,13 +49,31 @@ const FormParametersSection: React.FC<FormParametersSectionProps> = ({
 				<h3 className="text-md font-medium">Parameters</h3>
 
 				<div className="space-x-2">
-					<Button type="button" size="sm" variant="outline" onClick={() => onAddParameter('path')} disabled={isSubmittingForm}>
+					<Button
+						type="button"
+						size="sm"
+						variant="outline"
+						onClick={() => onAddParameter('path')}
+						disabled={isSubmittingForm}
+					>
 						Path
 					</Button>
-					<Button type="button" size="sm" variant="outline" onClick={() => onAddParameter('query')} disabled={isSubmittingForm}>
+					<Button
+						type="button"
+						size="sm"
+						variant="outline"
+						onClick={() => onAddParameter('query')}
+						disabled={isSubmittingForm}
+					>
 						Query
 					</Button>
-					<Button type="button" size="sm" variant="outline" onClick={() => onAddParameter('header')} disabled={isSubmittingForm}>
+					<Button
+						type="button"
+						size="sm"
+						variant="outline"
+						onClick={() => onAddParameter('header')}
+						disabled={isSubmittingForm}
+					>
 						Header
 					</Button>
 				</div>
@@ -57,12 +92,14 @@ const FormParametersSection: React.FC<FormParametersSectionProps> = ({
 					</TableHeader>
 
 					<TableBody>
-						{parameters.map(param => (
+						{parameters.map((param) => (
 							<TableRow key={param._id}>
 								<TableCell>
 									<Input
 										value={param.name}
-										onChange={e => onUpdateParameter(param._id, 'name', e.target.value)}
+										onChange={(e) =>
+											onUpdateParameter(param._id, 'name', e.target.value)
+										}
 										disabled={isSubmittingForm}
 									/>
 								</TableCell>
@@ -70,7 +107,13 @@ const FormParametersSection: React.FC<FormParametersSectionProps> = ({
 								<TableCell>
 									<Select
 										value={param.in}
-										onValueChange={val => onUpdateParameter(param._id, 'in', val as 'path' | 'query' | 'header')}
+										onValueChange={(val) =>
+											onUpdateParameter(
+												param._id,
+												'in',
+												val as 'path' | 'query' | 'header',
+											)
+										}
 										disabled={isSubmittingForm}
 									>
 										<SelectTrigger>
@@ -88,7 +131,9 @@ const FormParametersSection: React.FC<FormParametersSectionProps> = ({
 								<TableCell>
 									<Switch
 										checked={param.required || false}
-										onCheckedChange={val => onUpdateParameter(param._id, 'required', val)}
+										onCheckedChange={(val) =>
+											onUpdateParameter(param._id, 'required', val)
+										}
 										disabled={param.in === 'path' || isSubmittingForm}
 									/>
 								</TableCell>
@@ -96,7 +141,13 @@ const FormParametersSection: React.FC<FormParametersSectionProps> = ({
 								<TableCell>
 									<Input
 										value={param.description || ''}
-										onChange={e => onUpdateParameter(param._id, 'description', e.target.value)}
+										onChange={(e) =>
+											onUpdateParameter(
+												param._id,
+												'description',
+												e.target.value,
+											)
+										}
 										disabled={isSubmittingForm}
 									/>
 								</TableCell>

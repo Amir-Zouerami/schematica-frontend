@@ -277,7 +277,12 @@ export interface EndpointFormProps {
 		operation: OperationObject;
 	};
 	onClose: () => void;
-	onSubmit: (data: { path: string; method: string; operation: OperationObject; _lastKnownOperationUpdatedAt?: string }) => void;
+	onSubmit: (data: {
+		path: string;
+		method: string;
+		operation: OperationObject;
+		_lastKnownOperationUpdatedAt?: string;
+	}) => void;
 }
 
 export interface AccessControlList {
@@ -330,4 +335,11 @@ export interface ApiResponse<T> {
 	errorData?: any;
 }
 
-export type FetchBodyType = string | FormData | Blob | ArrayBuffer | ArrayBufferView | URLSearchParams | ReadableStream;
+export type FetchBodyType =
+	| string
+	| FormData
+	| Blob
+	| ArrayBuffer
+	| ArrayBufferView
+	| URLSearchParams
+	| ReadableStream;

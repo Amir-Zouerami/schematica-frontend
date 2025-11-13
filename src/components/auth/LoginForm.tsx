@@ -6,7 +6,14 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardFooter,
+	CardHeader,
+	CardTitle,
+} from '@/components/ui/card';
 
 const LoginForm = () => {
 	const [username, setUsername] = useState('');
@@ -28,11 +35,9 @@ const LoginForm = () => {
 		try {
 			await login(username, password);
 			navigate(redirectTo, { replace: true });
-		}
-		catch (err) {
+		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Login failed');
-		}
-		finally {
+		} finally {
 			setIsLoading(false);
 		}
 	};
@@ -40,7 +45,9 @@ const LoginForm = () => {
 	return (
 		<Card className="w-full max-w-md mx-auto glass-card">
 			<CardHeader>
-				<CardTitle className="text-gradient text-2xl font-bold">{import.meta.env.VITE_BRAND_NAME} API Docs</CardTitle>
+				<CardTitle className="text-gradient text-2xl font-bold">
+					{import.meta.env.VITE_BRAND_NAME} API Docs
+				</CardTitle>
 				<CardDescription>Enter your credentials to access the platform</CardDescription>
 			</CardHeader>
 			<CardContent>
@@ -60,7 +67,7 @@ const LoginForm = () => {
 							name="username"
 							autoComplete="username"
 							value={username}
-							onChange={e => setUsername(e.target.value)}
+							onChange={(e) => setUsername(e.target.value)}
 							required
 							className="bg-background/50"
 						/>
@@ -73,7 +80,7 @@ const LoginForm = () => {
 							name="password"
 							autoComplete="current-password"
 							value={password}
-							onChange={e => setPassword(e.target.value)}
+							onChange={(e) => setPassword(e.target.value)}
 							required
 							className="bg-background/50"
 						/>
@@ -84,7 +91,9 @@ const LoginForm = () => {
 				</form>
 			</CardContent>
 			<CardFooter>
-				<p className="text-xs text-muted-foreground">Please contact {import.meta.env.VITE_BRAND_NAME} team for support.</p>
+				<p className="text-xs text-muted-foreground">
+					Please contact {import.meta.env.VITE_BRAND_NAME} team for support.
+				</p>
 			</CardFooter>
 		</Card>
 	);

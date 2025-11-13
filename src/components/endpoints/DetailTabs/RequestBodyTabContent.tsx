@@ -24,7 +24,7 @@ const RequestBodyTabContent = ({ requestBody, openApiSpec }: RequestBodyTabConte
 	}, [requestBody]);
 
 	const handleCollapsibleChange = (id: string, isOpen: boolean) => {
-		setOpenCollapsibles(prev => ({ ...prev, [id]: isOpen }));
+		setOpenCollapsibles((prev) => ({ ...prev, [id]: isOpen }));
 	};
 
 	if (!requestBody || !requestBody.content || Object.keys(requestBody.content).length === 0) {
@@ -33,10 +33,16 @@ const RequestBodyTabContent = ({ requestBody, openApiSpec }: RequestBodyTabConte
 
 	return (
 		<div className="space-y-4">
-			{requestBody.description && <p className="text-sm text-muted-foreground mb-3">{requestBody.description}</p>}
+			{requestBody.description && (
+				<p className="text-sm text-muted-foreground mb-3">{requestBody.description}</p>
+			)}
 			<p className="text-sm mb-3">
 				<span className="font-medium text-muted-foreground">Required:</span>{' '}
-				{requestBody.required ? <span className="font-semibold text-pink-500">Yes</span> : <span className="text-foreground">No</span>}
+				{requestBody.required ? (
+					<span className="font-semibold text-pink-500">Yes</span>
+				) : (
+					<span className="text-foreground">No</span>
+				)}
 			</p>
 			{Object.entries(requestBody.content).map(([contentType, mediaTypeUntyped], index) => {
 				const mediaType = mediaTypeUntyped as MediaTypeObject;
@@ -48,7 +54,7 @@ const RequestBodyTabContent = ({ requestBody, openApiSpec }: RequestBodyTabConte
 						key={collapsibleId}
 						className="border border-border rounded-lg overflow-hidden"
 						open={isOpen}
-						onOpenChange={open => handleCollapsibleChange(collapsibleId, open)}
+						onOpenChange={(open) => handleCollapsibleChange(collapsibleId, open)}
 					>
 						<CollapsibleTrigger className="flex items-center justify-between w-full bg-card px-4 py-3 hover:bg-secondary/30 transition-colors rounded-t-lg data-[state=open]:border-b data-[state=open]:border-border">
 							<span className="font-medium text-foreground">
