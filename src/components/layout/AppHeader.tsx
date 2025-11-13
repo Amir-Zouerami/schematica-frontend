@@ -1,8 +1,10 @@
 import ChangePasswordModal from '@/components/auth/ChangePasswordModal';
+import UpdateProfilePictureModal from '@/components/profile/UpdateProfilePictureModal';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import NotificationBell from '@/components/notifications/NotificationBell';
 import { useAuth } from '@/contexts/AuthContext';
 import type { components } from '@/types/api-types';
-import { Key, LogOut, Shield } from 'lucide-react';
+import { Key, LogOut, Shield, UserCircle } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -20,6 +22,7 @@ const AppHeader = () => {
 	const { user, logout, isAuthenticated } = useAuth();
 	const navigate = useNavigate();
 	const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+	const [isProfilePictureModalOpen, setIsProfilePictureModalOpen] = useState(false);
 
 	const handleLogout = () => {
 		logout();
@@ -42,6 +45,8 @@ const AppHeader = () => {
 					{isAuthenticated && user && (
 						<div className="flex items-center space-x-4">
 							<div className="flex items-center space-x-2">
+								<NotificationBell />
+
 								<DropdownMenu>
 									<DropdownMenuTrigger asChild>
 										<div className="flex gap-3 hover:cursor-pointer items-center">
@@ -96,6 +101,13 @@ const AppHeader = () => {
 										)}
 
 										<DropdownMenuItem
+											onClick={() => setIsProfilePictureModalOpen(true)}
+										>
+											<UserCircle className="mr-2 h-4 w-4" />
+											Update Profile Picture
+										</DropdownMenuItem>
+
+										<DropdownMenuItem
 											onClick={() => setIsChangePasswordOpen(true)}
 										>
 											<Key className="mr-2 h-4 w-4" />
@@ -118,6 +130,11 @@ const AppHeader = () => {
 			<ChangePasswordModal
 				isOpen={isChangePasswordOpen}
 				onClose={() => setIsChangePasswordOpen(false)}
+			/>
+
+			<UpdateProfilePictureModal
+				isOpen={isProfilePictureModalOpen}
+				onClose={() => setIsProfilePictureModalOpen(false)}
 			/>
 		</>
 	);

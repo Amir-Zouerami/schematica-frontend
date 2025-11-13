@@ -1,5 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useCreateEndpoint, useUpdateEndpoint } from '@/hooks/api/useEndpoints';
+import { useReleaseLock } from '@/hooks/api/useLocking';
 import { useToast } from '@/hooks/use-toast';
 import { api, ApiError } from '@/utils/api';
 import { inferSchemaFromValue } from '@/utils/openApiUtils';
@@ -93,6 +94,7 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 	const { toast } = useToast();
 	const createEndpointMutation = useCreateEndpoint();
 	const updateEndpointMutation = useUpdateEndpoint();
+	const releaseLockMutation = useReleaseLock();
 	const isSubmitting = createEndpointMutation.isPending || updateEndpointMutation.isPending;
 
 	const [path, setPath] = useState('');
@@ -115,6 +117,26 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 		() => `endpointForm_${projectId}_${endpoint?.id || 'new'}`,
 		[projectId, endpoint],
 	);
+
+	// Effect to automatically release the lock when the form is closed (unmounted).
+	useEffect(() => {
+		return () => {
+			if (endpoint) {
+				releaseLockMutation.mutate(
+					{
+						projectId,
+						endpointId: endpoint.id,
+					},
+					{
+						onError: (err) => {
+							// Silently log the error, as the user has already navigated away from the form.
+							console.error('Failed to release endpoint lock on form close:', err);
+						},
+					},
+				);
+			}
+		};
+	}, [projectId, endpoint, releaseLockMutation]);
 
 	const populateFormFields = (endpointData: EndpointDto | undefined) => {
 		const op = endpointData?.operation as OperationObject | undefined;

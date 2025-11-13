@@ -1,5 +1,5 @@
-
 import CurlConverter from '@/components/endpoints/CurlConverter';
+import ChangelogTabContent from '@/components/endpoints/DetailTabs/ChangelogTabContent';
 import EndpointsList from '@/components/endpoints/EndpointsList';
 import OpenApiEditor from '@/components/openapi/OpenApiEditor';
 import ProjectAccessForm from '@/components/projects/ProjectAccessForm';
@@ -31,6 +31,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const ProjectDetailPage = () => {
 	const { projectId } = useParams<{ projectId: string }>();
@@ -324,26 +325,71 @@ const ProjectDetailPage = () => {
 						</Button>
 					)}
 				</div>
+
+				<Tabs defaultValue="endpoints" className="space-y-4">
+					<TabsList>
+						<TabsTrigger value="endpoints">Endpoints</TabsTrigger>
+						<TabsTrigger value="changelog">Changelog</TabsTrigger>
+					</TabsList>
+
+					<TabsContent value="endpoints">
+						<div>
+							{isProjectOwner(project) && openApiSpec && (
+								<div className="space-y-6 mb-6">
+									<CurlConverter
+										projectId={projectId || ''}
+										openApiSpec={openApiSpec}
+									/>
+								</div>
+							)}
+							{openApiSpec ? (
+								<EndpointsList
+									openApiSpec={openApiSpec}
+									projectId={projectId || ''}
+								/>
+							) : (
+								!isLoading && (
+									<p className="text-muted-foreground text-center py-8">
+										No API specification loaded for this project. Admins can
+										import one using the "Edit Open API" button.
+									</p>
+								)
+							)}
+						</div>
+					</TabsContent>
+
+					<TabsContent value="changelog">
+						<ChangelogTabContent projectId={projectId || ''} />
+					</TabsContent>
+				</Tabs>
 			</div>
 
-			<div>
-				{isProjectOwner(project) && openApiSpec && (
-					<div className="space-y-6 mb-6">
-						<CurlConverter projectId={projectId || ''} openApiSpec={openApiSpec} />
-					</div>
-				)}
-				{openApiSpec ? (
-					// **FIX: Removed the incorrect endpointIdMap prop**
-					<EndpointsList openApiSpec={openApiSpec} projectId={projectId || ''} />
-				) : (
-					!isLoading && (
-						<p className="text-muted-foreground text-center py-8">
-							No API specification loaded for this project. Admins can import one
-							using the "Edit Open API" button.
-						</p>
-					)
-				)}
-			</div>
+			<Tabs defaultValue="endpoints" className="space-y-4">
+				<TabsList>
+					<TabsTrigger value="endpoints">Endpoints</TabsTrigger>
+					<TabsTrigger value="changelog">Changelog</TabsTrigger>
+				</TabsList>
+				<TabsContent value="endpoints">
+					{isProjectOwner(project) && openApiSpec && (
+						<div className="space-y-6 mb-6">
+							<CurlConverter projectId={projectId || ''} openApiSpec={openApiSpec} />
+						</div>
+					)}
+					{openApiSpec ? (
+						<EndpointsList openApiSpec={openApiSpec} projectId={projectId || ''} />
+					) : (
+						!isLoading && (
+							<p className="text-muted-foreground text-center py-8">
+								No API specification loaded for this project. Admins can import one
+								using the "Edit Open API" button.
+							</p>
+						)
+					)}
+				</TabsContent>
+				<TabsContent value="changelog">
+					<ChangelogTabContent projectId={projectId || ''} />
+				</TabsContent>
+			</Tabs>
 
 			{isEditProjectModalOpen && (
 				<ProjectForm

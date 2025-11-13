@@ -1,4 +1,5 @@
 import { useDeleteEndpoint, useUpdateEndpoint } from '@/hooks/api/useEndpoints';
+import { useAcquireLock } from '@/hooks/api/useLocking';
 import { useProject } from '@/hooks/api/useProject';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -6,7 +7,16 @@ import type { components } from '@/types/api-types';
 import { OpenAPISpec, OperationObject, ParameterObject, RequestBodyObject } from '@/types/types';
 import { deeplyResolveReferences, formatDate } from '@/utils/schemaUtils';
 import React, { useMemo, useState } from 'react';
+import { useUpdateEndpointStatus } from '@/hooks/api/useEndpoints';
 
+import { Badge } from '@/components/ui/badge';
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from '@/components/ui/select';
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -22,7 +32,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Copy, Link as LinkIcon, Trash2 } from 'lucide-react';
+import { Copy, Edit3, Link as LinkIcon, Lock, Trash2 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 
 import { ApiError } from '@/utils/api';
@@ -51,6 +61,8 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 
 	const updateEndpointMutation = useUpdateEndpoint();
 	const deleteEndpointMutation = useDeleteEndpoint();
+	const acquireLockMutation = useAcquireLock();
+	const updateStatusMutation = useUpdateEndpointStatus();
 
 	const operation = useMemo(() => {
 		return deeplyResolveReferences<OperationObject>(
@@ -92,6 +104,23 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 	const createdAt = formatDate(endpoint.createdAt);
 	const lastEditedBy = endpoint.updatedBy.username;
 	const lastEditedAt = formatDate(endpoint.updatedAt);
+
+	const handleStatusChange = async (newStatus: components['schemas']['EndpointStatus']) => {
+		try {
+			await updateStatusMutation.mutateAsync({
+				projectId,
+				endpointId: endpoint.id,
+				statusData: { status: newStatus },
+			});
+			toast({
+				title: 'Status Updated',
+				description: `Endpoint status has been successfully changed to ${newStatus}.`,
+			});
+		} catch (err) {
+			const errorMessage = err instanceof ApiError ? err.message : 'Failed to update status.';
+			toast({ title: 'Update Failed', description: errorMessage, variant: 'destructive' });
+		}
+	};
 
 	const handleFormSubmit = async (formDataFromForm: any) => {
 		// This will be implemented in the next step
@@ -151,6 +180,25 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 		}
 	};
 
+	const handleEnterEditMode = async () => {
+		try {
+			await acquireLockMutation.mutateAsync({ projectId, endpointId: endpoint.id });
+			setIsEditMode(true);
+		} catch (err) {
+			let description = 'Could not acquire lock for editing. Please try again.';
+			if (err instanceof ApiError && err.status === 409) {
+				description = err.message;
+			} else if (err instanceof ApiError) {
+				description = err.message;
+			}
+			toast({
+				title: 'Cannot Edit Endpoint',
+				description,
+				variant: 'destructive',
+			});
+		}
+	};
+
 	if (isEditMode && isProjectOwner(project)) {
 		return (
 			<Dialog open={isEditMode} onOpenChange={setIsEditMode}>
@@ -171,18 +219,41 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 		<div className="px-4 py-2" id={endpoint.id}>
 			<div className="flex justify-between items-center gap-4 mb-4 mt-3">
 				<div>
-					<h3 className="text-lg font-semibold">
-						{operation.summary || `${endpoint.method.toUpperCase()} ${endpoint.path}`}
-					</h3>
+					<div className="flex items-center gap-4">
+						<h3 className="text-lg font-semibold">
+							{operation.summary ||
+								`${endpoint.method.toUpperCase()} ${endpoint.path}`}
+						</h3>
+						{isProjectOwner(project) ? (
+							<Select
+								value={endpoint.status}
+								onValueChange={handleStatusChange}
+								disabled={updateStatusMutation.isPending}
+							>
+								<SelectTrigger className="w-[180px] h-8 text-xs">
+									<SelectValue placeholder="Set status" />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value="DRAFT">Draft</SelectItem>
+									<SelectItem value="IN_REVIEW">In Review</SelectItem>
+									<SelectItem value="PUBLISHED">Published</SelectItem>
+									<SelectItem value="DEPRECATED">Deprecated</SelectItem>
+								</SelectContent>
+							</Select>
+						) : (
+							<Badge variant="outline">{endpoint.status}</Badge>
+						)}
+					</div>
 					{operation.description && (
 						<p
-							className="text-muted-foreground whitespace-pre-line mt-1 max-w-[900px]"
+							className="text-muted-foreground whitespace-pre-line mt-2 max-w-[900px]"
 							style={{ unicodeBidi: 'plaintext' }}
 						>
 							{operation.description}
 						</p>
 					)}
 				</div>
+
 				<div className="flex flex-col justify-center items-start space-y-2 sm:space-y-3 flex-shrink-0">
 					<div className="flex items-center space-x-2 text-sm text-muted-foreground">
 						<Avatar className="h-6 w-6">
@@ -226,11 +297,20 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 						<Button
 							variant="outline"
 							size="sm"
-							onClick={() => setIsEditMode(true)}
+							onClick={handleEnterEditMode}
 							className="mt-2 w-full"
-							disabled={updateEndpointMutation.isPending}
+							disabled={
+								updateEndpointMutation.isPending || acquireLockMutation.isPending
+							}
 						>
-							Edit Endpoint
+							{acquireLockMutation.isPending ? (
+								'Locking...'
+							) : (
+								<>
+									<Edit3 className="h-4 w-4 mr-2" />
+									Edit Endpoint
+								</>
+							)}
 						</Button>
 					)}
 				</div>
@@ -281,12 +361,7 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 						/>
 					</TabsContent>
 					<TabsContent value="notes">
-						<NotesSection
-							projectId={projectId}
-							path={endpoint.path}
-							method={endpoint.method}
-							operation={operation}
-						/>
+						<NotesSection projectId={projectId} endpointId={endpoint.id} />
 					</TabsContent>
 				</Tabs>
 			</div>

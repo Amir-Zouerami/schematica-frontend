@@ -1,0 +1,97 @@
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useChangelog } from '@/hooks/api/useChangelog';
+import type { components } from '@/types/api-types';
+import { ApiError } from '@/utils/api';
+import { formatDate } from '@/utils/schemaUtils';
+import React from 'react';
+
+type ChangelogDto = components['schemas']['ChangelogDto'];
+
+interface ChangelogTabContentProps {
+	projectId: string;
+}
+
+const ChangelogEntry: React.FC<{ entry: ChangelogDto }> = ({ entry }) => {
+	const actorUsername = entry.actor?.username || 'System';
+
+	return (
+		<div className="flex items-start space-x-4 py-4">
+			<Avatar className="h-8 w-8">
+				<AvatarImage
+					src={
+						entry.actor && typeof entry.actor.profileImage === 'string'
+							? entry.actor.profileImage
+							: undefined
+					}
+					alt={actorUsername}
+				/>
+				<AvatarFallback>{actorUsername.substring(0, 2).toUpperCase()}</AvatarFallback>
+			</Avatar>
+			<div className="flex-1">
+				<p className="text-sm text-foreground" style={{ unicodeBidi: 'plaintext' }}>
+					{entry.message}
+				</p>
+				<p className="text-xs text-muted-foreground mt-1">{formatDate(entry.createdAt)}</p>
+			</div>
+		</div>
+	);
+};
+
+const ChangelogTabContent: React.FC<ChangelogTabContentProps> = ({ projectId }) => {
+	const { data, error, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
+		useChangelog(projectId);
+
+	if (isLoading) {
+		return (
+			<div className="space-y-4">
+				<Skeleton className="h-16 w-full" />
+				<Skeleton className="h-16 w-full" />
+				<Skeleton className="h-16 w-full" />
+			</div>
+		);
+	}
+
+	if (error) {
+		return (
+			<p className="text-destructive text-center py-8">
+				Failed to load changelog:{' '}
+				{error instanceof ApiError ? error.message : error.message}
+			</p>
+		);
+	}
+
+	const allChangelogEntries = data?.pages.flatMap((page) => page?.data ?? []) ?? [];
+
+	if (allChangelogEntries.length === 0) {
+		return (
+			<p className="text-muted-foreground text-center py-8">
+				No changelog entries found for this project.
+			</p>
+		);
+	}
+
+	return (
+		<div>
+			<div className="divide-y">
+				{allChangelogEntries.map((entry) => (
+					<ChangelogEntry key={entry.id} entry={entry} />
+				))}
+			</div>
+			{hasNextPage && (
+				<div className="mt-6 flex justify-center">
+					<Button
+						onClick={() => fetchNextPage()}
+						disabled={isFetchingNextPage}
+						variant="outline"
+					>
+						{isFetchingNextPage ? 'Loading more...' : 'Load More'}
+					</Button>
+				</div>
+			)}
+		</div>
+	);
+};
+
+export default ChangelogTabContent;

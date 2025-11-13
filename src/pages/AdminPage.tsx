@@ -1,5 +1,6 @@
-import UserManagement from '@/components/admin/UserManagement';
+import AuditTrail from '@/components/admin/AuditTrail';
 import TeamManagement from '@/components/admin/TeamManagement';
+import UserManagement from '@/components/admin/UserManagement';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const AdminPage = () => {
@@ -13,6 +14,7 @@ const AdminPage = () => {
 				<TabsList>
 					<TabsTrigger value="users">Manage Users</TabsTrigger>
 					<TabsTrigger value="teams">Manage Teams</TabsTrigger>
+					<TabsTrigger value="audit">Audit Trail</TabsTrigger>
 				</TabsList>
 
 				<TabsContent value="users">
@@ -21,6 +23,10 @@ const AdminPage = () => {
 
 				<TabsContent value="teams">
 					<TeamManagement />
+				</TabsContent>
+
+				<TabsContent value="audit">
+					<AuditTrail />
 				</TabsContent>
 			</Tabs>
 		</div>

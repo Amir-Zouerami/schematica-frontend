@@ -1,11 +1,12 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/utils/api';
 import type { components } from '@/types/api-types';
+import { api } from '@/utils/api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 type EndpointSummaryDto = components['schemas']['EndpointSummaryDto'];
 type CreateEndpointDto = components['schemas']['CreateEndpointDto'];
 type UpdateEndpointDto = components['schemas']['UpdateEndpointDto'];
 type EndpointDto = components['schemas']['EndpointDto'];
+type UpdateEndpointStatusDto = components['schemas']['UpdateEndpointStatusDto'];
 
 export const useEndpoints = (projectId: string | undefined) => {
 	return useQuery({
@@ -106,6 +107,36 @@ export const useDeleteEndpoint = () => {
 			return endpointId;
 		},
 		onSuccess: (data, variables) => {
+			queryClient.invalidateQueries({ queryKey: ['endpoints', variables.projectId] });
+			queryClient.invalidateQueries({ queryKey: ['openapi', variables.projectId] });
+			queryClient.invalidateQueries({ queryKey: ['project', variables.projectId] });
+		},
+	});
+};
+
+export const useUpdateEndpointStatus = () => {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async ({
+			projectId,
+			endpointId,
+			statusData,
+		}: {
+			projectId: string;
+			endpointId: string;
+			statusData: UpdateEndpointStatusDto;
+		}) => {
+			const response = await api.post<EndpointDto>(
+				`/projects/${projectId}/endpoints/${endpointId}/status`,
+				statusData,
+			);
+			return response.data;
+		},
+		onSuccess: (data, variables) => {
+			queryClient.invalidateQueries({
+				queryKey: ['endpoint', variables.projectId, variables.endpointId],
+			});
 			queryClient.invalidateQueries({ queryKey: ['endpoints', variables.projectId] });
 			queryClient.invalidateQueries({ queryKey: ['openapi', variables.projectId] });
 			queryClient.invalidateQueries({ queryKey: ['project', variables.projectId] });
