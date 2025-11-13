@@ -18,11 +18,19 @@ const EndpointDetailLoader: React.FC<EndpointDetailLoaderProps> = ({
 
 	if (isLoading) {
 		return (
-			<div className="p-4 space-y-4">
-				<Skeleton className="h-6 w-3/4" />
-				<Skeleton className="h-4 w-1/2" />
+			<div className="p-4 space-y-4 min-h-[400px]">
+				<div className="flex justify-between items-start">
+					<div className="space-y-2">
+						<Skeleton className="h-6 w-72" />
+						<Skeleton className="h-4 w-48" />
+					</div>
+					<div className="space-y-2 flex flex-col items-end">
+						<Skeleton className="h-5 w-40" />
+						<Skeleton className="h-5 w-44" />
+					</div>
+				</div>
 				<div className="pt-4">
-					<Skeleton className="h-8 w-full" />
+					<Skeleton className="h-10 w-full" />
 				</div>
 			</div>
 		);

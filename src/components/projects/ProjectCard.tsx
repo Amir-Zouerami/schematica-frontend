@@ -82,6 +82,10 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete }) => {
 						? project.description
 						: 'No description provided.'}
 				</p>
+
+				<div className="text-xs bg-secondary/30 rounded p-2 font-mono overflow-x-auto">
+					{project.serverUrl ?? 'api.example.com'}
+				</div>
 			</CardContent>
 
 			<CardFooter className="pt-2 flex justify-between items-center">

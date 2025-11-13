@@ -1,23 +1,37 @@
 import type { components } from '@/types/api-types';
 import { api } from '@/utils/api';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 type EndpointSummaryDto = components['schemas']['EndpointSummaryDto'];
 type CreateEndpointDto = components['schemas']['CreateEndpointDto'];
 type UpdateEndpointDto = components['schemas']['UpdateEndpointDto'];
 type EndpointDto = components['schemas']['EndpointDto'];
 type UpdateEndpointStatusDto = components['schemas']['UpdateEndpointStatusDto'];
+type PaginationMetaDto = components['schemas']['PaginationMetaDto'];
 
-export const useEndpoints = (projectId: string | undefined) => {
-	return useQuery({
+interface EndpointsResponse {
+	data: EndpointSummaryDto[];
+	meta: PaginationMetaDto;
+}
+
+export const useEndpoints = (projectId: string | undefined, limit = 50) => {
+	return useInfiniteQuery({
 		queryKey: ['endpoints', projectId],
-		queryFn: async () => {
+		queryFn: async ({ pageParam = 1 }) => {
 			if (!projectId) return null;
-			const response = await api.get<{ data: EndpointSummaryDto[] }>(
-				`/projects/${projectId}/endpoints`,
-				{ params: { limit: 1000 } },
-			);
-			return response.data.data;
+			const response = await api.get<EndpointsResponse>(`/projects/${projectId}/endpoints`, {
+				params: { page: pageParam, limit },
+			});
+			return response;
+		},
+		initialPageParam: 1,
+		getNextPageParam: (lastPage) => {
+			if (!lastPage || !lastPage.meta) return undefined;
+			const { page, lastPage: totalPages } = lastPage.meta;
+			if (page >= totalPages) {
+				return undefined;
+			}
+			return page + 1;
 		},
 		enabled: !!projectId,
 	});
@@ -34,6 +48,7 @@ export const useEndpoint = (projectId: string | undefined, endpointId: string | 
 			return response.data;
 		},
 		enabled: !!projectId && !!endpointId,
+		staleTime: 1000 * 60 * 5,
 	});
 };
 

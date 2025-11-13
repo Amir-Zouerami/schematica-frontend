@@ -325,43 +325,6 @@ const ProjectDetailPage = () => {
 						</Button>
 					)}
 				</div>
-
-				<Tabs defaultValue="endpoints" className="space-y-4">
-					<TabsList>
-						<TabsTrigger value="endpoints">Endpoints</TabsTrigger>
-						<TabsTrigger value="changelog">Changelog</TabsTrigger>
-					</TabsList>
-
-					<TabsContent value="endpoints">
-						<div>
-							{isProjectOwner(project) && openApiSpec && (
-								<div className="space-y-6 mb-6">
-									<CurlConverter
-										projectId={projectId || ''}
-										openApiSpec={openApiSpec}
-									/>
-								</div>
-							)}
-							{openApiSpec ? (
-								<EndpointsList
-									openApiSpec={openApiSpec}
-									projectId={projectId || ''}
-								/>
-							) : (
-								!isLoading && (
-									<p className="text-muted-foreground text-center py-8">
-										No API specification loaded for this project. Admins can
-										import one using the "Edit Open API" button.
-									</p>
-								)
-							)}
-						</div>
-					</TabsContent>
-
-					<TabsContent value="changelog">
-						<ChangelogTabContent projectId={projectId || ''} />
-					</TabsContent>
-				</Tabs>
 			</div>
 
 			<Tabs defaultValue="endpoints" className="space-y-4">

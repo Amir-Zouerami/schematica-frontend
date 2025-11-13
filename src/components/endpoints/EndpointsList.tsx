@@ -5,13 +5,15 @@ import {
 	AccordionTrigger,
 } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
-import { useDeleteEndpoint, useEndpoints } from '@/hooks/api/useEndpoints';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useEndpoints } from '@/hooks/api/useEndpoints';
 import { useProject } from '@/hooks/api/useProject';
-import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
 import { OpenAPISpec } from '@/types/types';
+import { ApiError } from '@/utils/api';
 import React, { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import EndpointDetailLoader from './EndpointDetailLoader';
 
 interface EndpointsListProps {
@@ -22,24 +24,23 @@ interface EndpointsListProps {
 const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId }) => {
 	const { isProjectOwner } = usePermissions();
 	const { data: project } = useProject(projectId);
-	const { toast } = useToast();
 	const location = useLocation();
-	const navigate = useNavigate();
 
-	const { data: endpoints, isLoading } = useEndpoints(projectId);
-	const deleteEndpointMutation = useDeleteEndpoint();
+	const { data, error, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
+		useEndpoints(projectId);
 
-	const [endpointToDelete, setEndpointToDelete] = useState<{
-		summary: string;
-		endpointId: string;
-	} | null>(null);
 	const [openAccordionItems, setOpenAccordionItems] = useState<string[]>([]);
 	const [itemToScrollTo, setItemToScrollTo] = useState<string | null>(null);
 
+	const allEndpoints = useMemo(
+		() => data?.pages.flatMap((page) => page?.data ?? []) ?? [],
+		[data],
+	);
+
 	const groupedEndpoints = useMemo(() => {
-		if (!endpoints) return {};
-		const groups: Record<string, typeof endpoints> = {};
-		endpoints.forEach((endpoint) => {
+		if (!allEndpoints) return {};
+		const groups: Record<string, typeof allEndpoints> = {};
+		allEndpoints.forEach((endpoint) => {
 			const tagName = endpoint.tags?.[0] || 'Default';
 			if (!groups[tagName]) groups[tagName] = [];
 			groups[tagName].push(endpoint);
@@ -49,12 +50,12 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 			if (b === 'Default') return -1;
 			return a.localeCompare(b);
 		});
-		const orderedGroups: Record<string, typeof endpoints> = {};
+		const orderedGroups: Record<string, typeof allEndpoints> = {};
 		sortedTagNames.forEach((tagName) => {
 			orderedGroups[tagName] = groups[tagName];
 		});
 		return orderedGroups;
-	}, [endpoints]);
+	}, [allEndpoints]);
 
 	const generateClientSideId = (method: string, path: string): string => {
 		const methodPart = method.toLowerCase();
@@ -66,9 +67,9 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 	};
 
 	useEffect(() => {
-		if (location.hash && endpoints) {
+		if (location.hash && allEndpoints) {
 			const elementIdFromHash = location.hash.substring(1);
-			const endpointMatch = endpoints.find(
+			const endpointMatch = allEndpoints.find(
 				(ep) => generateClientSideId(ep.method, ep.path) === elementIdFromHash,
 			);
 			if (endpointMatch) {
@@ -79,7 +80,7 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 				setItemToScrollTo(clientSideId);
 			}
 		}
-	}, [location.hash, endpoints]);
+	}, [location.hash, allEndpoints]);
 
 	useEffect(() => {
 		if (itemToScrollTo && openAccordionItems.includes(itemToScrollTo)) {
@@ -103,13 +104,26 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 		head: 'bg-gray-600 hover:bg-gray-700',
 	};
 
-	const allEndpointCount = endpoints?.length || 0;
-
 	if (isLoading) {
-		return <p>Loading endpoints...</p>;
+		return (
+			<div className="space-y-4">
+				<Skeleton className="h-12 w-full" />
+				<Skeleton className="h-12 w-full" />
+				<Skeleton className="h-12 w-full" />
+			</div>
+		);
 	}
 
-	if (allEndpointCount === 0) {
+	if (error) {
+		return (
+			<p className="text-destructive text-center py-8">
+				Failed to load endpoints:{' '}
+				{error instanceof ApiError ? error.message : error.message}
+			</p>
+		);
+	}
+
+	if (allEndpoints.length === 0) {
 		return (
 			<div className="text-center py-10">
 				<p className="text-muted-foreground mb-4">No endpoints defined yet.</p>
@@ -191,6 +205,17 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 					</Accordion>
 				</div>
 			))}
+			{hasNextPage && (
+				<div className="mt-6 flex justify-center">
+					<Button
+						onClick={() => fetchNextPage()}
+						disabled={isFetchingNextPage}
+						variant="outline"
+					>
+						{isFetchingNextPage ? 'Loading more...' : 'Load More'}
+					</Button>
+				</div>
+			)}
 		</div>
 	);
 };

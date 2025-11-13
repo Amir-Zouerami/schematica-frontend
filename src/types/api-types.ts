@@ -661,6 +661,7 @@ export interface components {
             id: string;
             name: string;
             description: Record<string, never> | null;
+            serverUrl: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */

@@ -248,14 +248,6 @@
 	transition: height 300ms ease;
 }
 
-.data-[state='open']:animate-accordion-down {
-	animation-duration: 200ms;
-}
-
-.data-[state='closed']:animate-accordion-up {
-	animation-duration: 200ms;
-}
-
 /* Scrollbar styling */
 ::-webkit-scrollbar {
 	width: 10px;
