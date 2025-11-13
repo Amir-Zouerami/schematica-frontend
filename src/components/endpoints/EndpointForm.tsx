@@ -1,20 +1,26 @@
-/* eslint-disable no-useless-escape */
-
-import { api } from '@/utils/api';
-import { v4 as uuidv4 } from 'uuid';
-import { X, RefreshCw } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useCreateEndpoint, useUpdateEndpoint } from '@/hooks/api/useEndpoints';
 import { useToast } from '@/hooks/use-toast';
+import { api, ApiError } from '@/utils/api';
+import { inferSchemaFromValue } from '@/utils/openApiUtils';
+import { RefreshCw, X } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { v4 as uuidv4 } from 'uuid';
+
+import {
+	AlertDialog,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext';
-import { Textarea } from '@/components/ui/textarea';
-import { inferSchemaFromValue } from '@/utils/openApiUtils';
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import {
 	Select,
 	SelectContent,
@@ -22,30 +28,20 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 
+import type { components } from '@/types/api-types';
 import {
-	AlertDialog,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-	AlertDialogCancel,
-} from '@/components/ui/alert-dialog';
-
-import {
-	EndpointFormProps,
+	ExampleObject,
+	MediaTypeObject,
+	OpenAPISpec,
 	OperationObject,
 	ParameterObject,
-	ResponseObject,
-	RequestBodyObject,
-	AppMetadata,
-	SchemaObject,
 	ReferenceObject,
-	OpenAPISpec,
-	MediaTypeObject,
-	ExampleObject,
-	ApiResponse,
+	RequestBodyObject,
+	ResponseObject,
 } from '@/types/types';
 
 import FormParametersSection, {
@@ -58,11 +54,26 @@ import FormResponsesSection, {
 	ManagedResponseUI as SectionManagedResponseUI,
 } from './FormSections/FormResponsesSection';
 
+// --- START: Corrected Type Definitions ---
+// These types inherit from the incorrect generated DTOs but fix the 'operation' property.
+type CorrectedCreateEndpointDto = Omit<components['schemas']['CreateEndpointDto'], 'operation'> & {
+	operation: OperationObject;
+};
+type CorrectedUpdateEndpointDto = Omit<components['schemas']['UpdateEndpointDto'], 'operation'> & {
+	operation: OperationObject;
+};
+// --- END: Corrected Type Definitions ---
+
+type EndpointDto = components['schemas']['EndpointDto'];
 type ManagedParameterUI = SectionManagedParameterUI;
 type ManagedRequestBodyUI = SectionManagedRequestBodyUI;
 type ManagedResponseUI = SectionManagedResponseUI;
 
-interface FullEndpointFormProps extends EndpointFormProps {
+interface FullEndpointFormProps {
+	projectId: string;
+	endpoint?: EndpointDto;
+	onClose: () => void;
+	onSubmit: (data: any) => void;
 	openApiSpec: OpenAPISpec;
 }
 
@@ -74,16 +85,15 @@ interface ConflictDetails {
 
 const EndpointForm: React.FC<FullEndpointFormProps> = ({
 	projectId,
-	initialEndpoint,
+	endpoint,
 	onClose,
-	onSubmit,
 	openApiSpec,
 }) => {
 	const { user } = useAuth();
 	const { toast } = useToast();
-	const initialEndpointRef = useRef<typeof initialEndpoint | undefined>(undefined);
-	const hasInitializedFromProps = useRef(false);
-	const currentInitialEndpointId = useRef<string | null>(null);
+	const createEndpointMutation = useCreateEndpoint();
+	const updateEndpointMutation = useUpdateEndpoint();
+	const isSubmitting = createEndpointMutation.isPending || updateEndpointMutation.isPending;
 
 	const [path, setPath] = useState('');
 	const [method, setMethod] = useState('get');
@@ -92,29 +102,22 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 	const [tags, setTags] = useState<string[]>([]);
 	const [currentTagInput, setCurrentTagInput] = useState('');
 	const [isDeprecated, setIsDeprecated] = useState(false);
-	const [lastKnownOperationUpdatedAt, setLastKnownOperationUpdatedAt] = useState<
-		string | undefined
-	>(undefined);
+	const [lastKnownUpdatedAt, setLastKnownUpdatedAt] = useState<string | undefined>(undefined);
 
 	const [parameters, setParameters] = useState<ManagedParameterUI[]>([]);
 	const [requestBodyState, setRequestBodyState] = useState<ManagedRequestBodyUI | undefined>(
 		undefined,
 	);
 	const [managedResponses, setManagedResponses] = useState<ManagedResponseUI[]>([]);
-
-	const [isSubmittingForm, setIsSubmittingForm] = useState(false);
 	const [conflictDetails, setConflictDetails] = useState<ConflictDetails | null>(null);
 
 	const formId = useMemo(
-		() =>
-			`endpointForm_${projectId}_${initialEndpoint?.method || 'newMethod'}_${(
-				initialEndpoint?.path || 'newPath'
-			).replace(/[\/{}]/g, '_')}`,
-		[projectId, initialEndpoint?.method, initialEndpoint?.path],
+		() => `endpointForm_${projectId}_${endpoint?.id || 'new'}`,
+		[projectId, endpoint],
 	);
 
-	const populateFormFields = (endpointData: typeof initialEndpoint | undefined) => {
-		const op = endpointData?.operation;
+	const populateFormFields = (endpointData: EndpointDto | undefined) => {
+		const op = endpointData?.operation as OperationObject | undefined;
 		setPath(endpointData?.path || '');
 		setMethod(endpointData?.method || 'get');
 		setSummary(op?.summary || '');
@@ -122,7 +125,7 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 		setTags(op?.tags || []);
 		setCurrentTagInput('');
 		setIsDeprecated(op?.deprecated || false);
-		setLastKnownOperationUpdatedAt(op?.['x-app-metadata']?.lastEditedAt);
+		setLastKnownUpdatedAt(endpointData?.updatedAt);
 
 		if (op?.parameters) {
 			setParameters(
@@ -131,29 +134,27 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 		} else {
 			setParameters([]);
 		}
+
 		const resolvedRb = op?.requestBody as RequestBodyObject | undefined;
 		if (resolvedRb) {
 			const contentType = Object.keys(resolvedRb.content || {})[0] || 'application/json';
 			const mediaType = resolvedRb.content?.[contentType] as MediaTypeObject | undefined;
-
 			let exampleForForm: any = {};
 			let exampleNameForForm: string | undefined = undefined;
 
-			if (mediaType) {
-				if (mediaType.examples && Object.keys(mediaType.examples).length > 0) {
-					const firstExampleKey = Object.keys(mediaType.examples)[0];
-					exampleNameForForm = firstExampleKey;
-
-					const firstExampleObject = mediaType.examples[firstExampleKey] as
-						| ExampleObject
-						| ReferenceObject
-						| undefined;
-
-					if (firstExampleObject && 'value' in firstExampleObject)
-						exampleForForm = (firstExampleObject as ExampleObject).value;
-					else exampleForForm = firstExampleObject;
-				} else if (mediaType.example !== undefined) exampleForForm = mediaType.example;
+			if (mediaType?.examples && Object.keys(mediaType.examples).length > 0) {
+				const firstExampleKey = Object.keys(mediaType.examples)[0];
+				exampleNameForForm = firstExampleKey;
+				const firstExampleObject = mediaType.examples[firstExampleKey] as
+					| ExampleObject
+					| ReferenceObject
+					| undefined;
+				if (firstExampleObject && 'value' in firstExampleObject)
+					exampleForForm = (firstExampleObject as ExampleObject).value;
+			} else if (mediaType?.example !== undefined) {
+				exampleForForm = mediaType.example;
 			}
+
 			setRequestBodyState({
 				description: resolvedRb.description || '',
 				required: resolvedRb.required || false,
@@ -176,42 +177,37 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 						let exampleForForm: any = {};
 						let exampleNameForForm: string | undefined = undefined;
 
-						if (appJsonContent) {
-							if (
-								appJsonContent.examples &&
-								Object.keys(appJsonContent.examples).length > 0
-							) {
-								const firstExampleKey = Object.keys(appJsonContent.examples)[0];
-								exampleNameForForm = firstExampleKey;
-
-								const firstExampleObject = appJsonContent.examples[
-									firstExampleKey
-								] as ExampleObject | ReferenceObject | undefined;
-
-								if (firstExampleObject && 'value' in firstExampleObject)
-									exampleForForm = (firstExampleObject as ExampleObject).value;
-								else exampleForForm = firstExampleObject;
-							} else if (appJsonContent.example !== undefined)
-								exampleForForm = appJsonContent.example;
+						if (
+							appJsonContent?.examples &&
+							Object.keys(appJsonContent.examples).length > 0
+						) {
+							const firstExampleKey = Object.keys(appJsonContent.examples)[0];
+							exampleNameForForm = firstExampleKey;
+							const firstExampleObject = appJsonContent.examples[firstExampleKey] as
+								| ExampleObject
+								| ReferenceObject
+								| undefined;
+							if (firstExampleObject && 'value' in firstExampleObject)
+								exampleForForm = (firstExampleObject as ExampleObject).value;
+						} else if (appJsonContent?.example !== undefined) {
+							exampleForForm = appJsonContent.example;
 						}
 
 						return {
 							_id: uuidv4(),
 							statusCode,
 							description: respData.description,
-							content: respData.content
-								? {
-										'application/json': {
-											schemaString: JSON.stringify(
-												appJsonContent?.schema || {},
-												null,
-												2,
-											),
-											exampleString: JSON.stringify(exampleForForm, null, 2),
-											exampleName: exampleNameForForm,
-										},
-									}
-								: undefined,
+							content: {
+								'application/json': {
+									schemaString: JSON.stringify(
+										appJsonContent?.schema || {},
+										null,
+										2,
+									),
+									exampleString: JSON.stringify(exampleForForm, null, 2),
+									exampleName: exampleNameForForm,
+								},
+							},
 						};
 					},
 				),
@@ -229,42 +225,10 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 	};
 
 	useEffect(() => {
-		const newEndpointIdentifier = initialEndpoint
-			? `${initialEndpoint.path}-${initialEndpoint.method}`
-			: null;
-
-		if (
-			initialEndpoint &&
-			(!currentInitialEndpointId.current ||
-				currentInitialEndpointId.current !== newEndpointIdentifier) &&
-			!conflictDetails
-		) {
-			populateFormFields(initialEndpoint);
-			initialEndpointRef.current = initialEndpoint;
-			currentInitialEndpointId.current = newEndpointIdentifier;
-			hasInitializedFromProps.current = true;
-			setConflictDetails(null);
-			setIsSubmittingForm(false);
-		} else if (
-			initialEndpoint &&
-			currentInitialEndpointId.current === newEndpointIdentifier &&
-			!hasInitializedFromProps.current &&
-			!conflictDetails
-		) {
-			populateFormFields(initialEndpoint);
-			hasInitializedFromProps.current = true;
+		if (!conflictDetails) {
+			populateFormFields(endpoint);
 		}
-
-		if (!initialEndpoint && currentInitialEndpointId.current !== null) {
-			populateFormFields(undefined);
-			initialEndpointRef.current = undefined;
-			currentInitialEndpointId.current = null;
-			hasInitializedFromProps.current = false;
-			setConflictDetails(null);
-			setIsSubmittingForm(false);
-		}
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [initialEndpoint, conflictDetails]);
+	}, [endpoint, conflictDetails]);
 
 	const addParameter = (paramType: 'path' | 'query' | 'header') => {
 		setParameters((prev) => [
@@ -288,7 +252,6 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 	) => {
 		setParameters((prev) => prev.map((p) => (p._id === id ? { ...p, [field]: value } : p)));
 	};
-
 	const updateRequestBodyStateDirect = (field: keyof ManagedRequestBodyUI, value: any) => {
 		setRequestBodyState((prev) => {
 			const base: ManagedRequestBodyUI = prev || {
@@ -297,48 +260,30 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 				contentType: 'application/json',
 				schemaString: '{}',
 				exampleString: '{}',
-				exampleName: undefined,
 			};
-
 			let newSchemaString = base.schemaString;
-			const currentExampleString = field === 'exampleString' ? value : base.exampleString;
-			let currentExampleName = base.exampleName;
-
 			if (field === 'exampleString') {
 				try {
 					const parsedExample = JSON.parse(value);
-					const inferredSchema = inferSchemaFromValue(parsedExample);
-					newSchemaString = JSON.stringify(inferredSchema, null, 2);
-					currentExampleName = undefined;
+					newSchemaString = JSON.stringify(inferSchemaFromValue(parsedExample), null, 2);
 				} catch (e) {
-					/* Keep old schema */
+					/* Intentionally empty */
 				}
-
-				return {
-					...base,
-					exampleString: currentExampleString,
-					schemaString: newSchemaString,
-					exampleName: currentExampleName,
-				};
+				return { ...base, exampleString: value, schemaString: newSchemaString };
 			}
-
 			return { ...base, [field]: value };
 		});
 	};
-
 	const ensureRequestBodyStateExists = () => {
-		if (!requestBodyState) {
+		if (!requestBodyState)
 			setRequestBodyState({
 				description: '',
 				required: false,
 				contentType: 'application/json',
 				schemaString: '{}',
 				exampleString: '{}',
-				exampleName: undefined,
 			});
-		}
 	};
-
 	const handleAddNewResponseEntry = () => {
 		setManagedResponses((prev) => [
 			...prev,
@@ -346,35 +291,22 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 				_id: uuidv4(),
 				statusCode: '',
 				description: '',
-				content: {
-					'application/json': {
-						schemaString: '{}',
-						exampleString: '{}',
-						exampleName: undefined,
-					},
-				},
+				content: { 'application/json': { schemaString: '{}', exampleString: '{}' } },
 			},
 		]);
 	};
-
 	const removeManagedResponse = (id: string) => {
 		setManagedResponses((prev) => prev.filter((r) => r._id !== id));
 	};
-
 	const updateManagedResponseValue = (
 		id: string,
 		field: 'statusCode' | 'description',
 		value: string,
 	) => {
 		setManagedResponses((prev) =>
-			prev.map((r) =>
-				r._id === id
-					? { ...r, [field]: field === 'statusCode' ? String(value).trim() : value }
-					: r,
-			),
+			prev.map((r) => (r._id === id ? { ...r, [field]: value } : r)),
 		);
 	};
-
 	const updateResponseContentString = (
 		id: string,
 		type: 'schemaString' | 'exampleString',
@@ -386,25 +318,23 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 					const currentAppJson = r.content?.['application/json'] || {
 						schemaString: '',
 						exampleString: '',
-						exampleName: undefined,
 					};
 					let newSchemaString =
 						type === 'schemaString' ? value : currentAppJson.schemaString;
 					const newExampleString =
 						type === 'exampleString' ? value : currentAppJson.exampleString;
-					let newExampleName = currentAppJson.exampleName;
-
 					if (type === 'exampleString') {
 						try {
 							const parsedExample = JSON.parse(value);
-							const inferredSchema = inferSchemaFromValue(parsedExample);
-							newSchemaString = JSON.stringify(inferredSchema, null, 2);
-							newExampleName = undefined;
+							newSchemaString = JSON.stringify(
+								inferSchemaFromValue(parsedExample),
+								null,
+								2,
+							);
 						} catch (e) {
-							/* Keep old schema */
+							/* Intentionally empty */
 						}
 					}
-
 					return {
 						...r,
 						content: {
@@ -412,12 +342,10 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 								...currentAppJson,
 								schemaString: newSchemaString,
 								exampleString: newExampleString,
-								exampleName: newExampleName,
 							},
 						},
 					};
 				}
-
 				return r;
 			}),
 		);
@@ -425,62 +353,36 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 
 	const handleAddTag = () => {
 		const newTag = currentTagInput.trim();
-
-		if (newTag && !tags.includes(newTag)) {
-			setTags((prev) => [...prev, newTag]);
-		}
-
+		if (newTag && !tags.includes(newTag)) setTags((prev) => [...prev, newTag]);
 		setCurrentTagInput('');
 	};
-
 	const handleRemoveTag = (tagToRemove: string) => {
 		setTags((prev) => prev.filter((tag) => tag !== tagToRemove));
 	};
 
-	const handleCloseConflictDialogOnly = () => {
-		setConflictDetails(null);
-		setIsSubmittingForm(false);
-		toast({
-			title: 'Conflict Noted',
-			description:
-				'Your edits are still in the form. Please review or copy them before proceeding.',
-			duration: 7000,
-		});
-	};
-
 	const handleSubmit = async (e?: React.FormEvent, forceOverwrite = false) => {
 		if (e) e.preventDefault();
-		setIsSubmittingForm(true);
-
-		if (!forceOverwrite) {
-			setConflictDetails(null);
-		}
+		if (!forceOverwrite) setConflictDetails(null);
 
 		let submissionError = false;
-
-		const finalParameters: ParameterObject[] = parameters.map((p_ui) => {
-			const { _id, ...paramData } = p_ui;
-			return paramData as ParameterObject;
-		});
-
+		const finalParameters: ParameterObject[] = parameters.map(
+			({ _id, ...paramData }) => paramData as ParameterObject,
+		);
 		let finalRequestBody: RequestBodyObject | undefined = undefined;
 
 		if (requestBodyState) {
-			let currentRbSchema: SchemaObject | ReferenceObject | undefined;
-			let currentRbExampleData: any | undefined;
-
 			try {
-				if (
-					requestBodyState.schemaString.trim() &&
-					requestBodyState.schemaString.trim() !== '{}'
-				)
-					currentRbSchema = JSON.parse(requestBodyState.schemaString);
-
-				if (
-					requestBodyState.exampleString.trim() &&
-					requestBodyState.exampleString.trim() !== '{}'
-				)
-					currentRbExampleData = JSON.parse(requestBodyState.exampleString);
+				const schema = requestBodyState.schemaString.trim()
+					? JSON.parse(requestBodyState.schemaString)
+					: undefined;
+				const example = requestBodyState.exampleString.trim()
+					? JSON.parse(requestBodyState.exampleString)
+					: undefined;
+				finalRequestBody = {
+					description: requestBodyState.description,
+					required: requestBodyState.required,
+					content: { [requestBodyState.contentType]: { schema, example } },
+				};
 			} catch (err) {
 				toast({
 					title: 'Error',
@@ -489,49 +391,10 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 				});
 				submissionError = true;
 			}
-
-			if (!submissionError) {
-				const rbConstruct: RequestBodyObject = {
-					description: requestBodyState.description,
-					required: requestBodyState.required,
-				};
-
-				if (currentRbSchema || currentRbExampleData) {
-					rbConstruct.content = { [requestBodyState.contentType]: {} };
-					const mediaTypeTarget = rbConstruct.content[
-						requestBodyState.contentType
-					] as MediaTypeObject;
-
-					if (currentRbSchema) mediaTypeTarget.schema = currentRbSchema;
-					if (currentRbExampleData) {
-						if (requestBodyState.exampleName)
-							mediaTypeTarget.examples = {
-								[requestBodyState.exampleName]: { value: currentRbExampleData },
-							};
-						else mediaTypeTarget.example = currentRbExampleData;
-					}
-
-					if (Object.keys(mediaTypeTarget).length === 0)
-						delete rbConstruct.content[requestBodyState.contentType];
-					if (rbConstruct.content && Object.keys(rbConstruct.content).length === 0)
-						delete rbConstruct.content;
-				}
-
-				if (rbConstruct.description || rbConstruct.required || rbConstruct.content)
-					finalRequestBody = rbConstruct;
-			}
-		}
-
-		if (submissionError) {
-			setIsSubmittingForm(false);
-			return;
 		}
 
 		const finalResponses: Record<string, ResponseObject> = {};
-
 		managedResponses.forEach((mr_ui) => {
-			if (submissionError) return;
-
 			if (!mr_ui.statusCode.trim()) {
 				toast({
 					title: 'Error',
@@ -541,24 +404,17 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 				submissionError = true;
 				return;
 			}
-
-			const respConstruct: ResponseObject = { description: mr_ui.description };
-			let currentRespSchema: SchemaObject | ReferenceObject | undefined;
-			let currentRespExampleData: any | undefined;
-			const appJsonContentStrings = mr_ui.content?.['application/json'];
-
 			try {
-				if (
-					appJsonContentStrings?.schemaString?.trim() &&
-					appJsonContentStrings.schemaString.trim() !== '{}'
-				)
-					currentRespSchema = JSON.parse(appJsonContentStrings.schemaString);
-
-				if (
-					appJsonContentStrings?.exampleString?.trim() &&
-					appJsonContentStrings.exampleString.trim() !== '{}'
-				)
-					currentRespExampleData = JSON.parse(appJsonContentStrings.exampleString);
+				const schema = mr_ui.content?.['application/json']?.schemaString?.trim()
+					? JSON.parse(mr_ui.content['application/json'].schemaString)
+					: undefined;
+				const example = mr_ui.content?.['application/json']?.exampleString?.trim()
+					? JSON.parse(mr_ui.content['application/json'].exampleString)
+					: undefined;
+				finalResponses[mr_ui.statusCode.trim()] = {
+					description: mr_ui.description,
+					content: { 'application/json': { schema, example } },
+				};
 			} catch (err) {
 				toast({
 					title: 'Error',
@@ -566,40 +422,12 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 					variant: 'destructive',
 				});
 				submissionError = true;
-				return;
 			}
-
-			if (currentRespSchema || currentRespExampleData) {
-				respConstruct.content = { 'application/json': {} };
-				const mediaTypeTarget = respConstruct.content[
-					'application/json'
-				] as MediaTypeObject;
-
-				if (currentRespSchema) mediaTypeTarget.schema = currentRespSchema;
-
-				if (currentRespExampleData) {
-					const exampleNameFromState = appJsonContentStrings?.exampleName;
-					if (exampleNameFromState)
-						mediaTypeTarget.examples = {
-							[exampleNameFromState]: { value: currentRespExampleData },
-						};
-					else mediaTypeTarget.example = currentRespExampleData;
-				}
-
-				if (Object.keys(mediaTypeTarget).length === 0)
-					delete respConstruct.content['application/json'];
-				if (respConstruct.content && Object.keys(respConstruct.content).length === 0)
-					delete respConstruct.content;
-			}
-			finalResponses[mr_ui.statusCode.trim()] = respConstruct;
 		});
 
-		if (submissionError) {
-			setIsSubmittingForm(false);
-			return;
-		}
+		if (submissionError) return;
 
-		const operationBase = {
+		const operationForBackend: OperationObject = {
 			summary,
 			description,
 			tags,
@@ -609,138 +437,95 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 			responses: Object.keys(finalResponses).length > 0 ? finalResponses : undefined,
 		};
 
-		let appMetadata: AppMetadata;
-		const metadataSource = initialEndpoint?.operation?.['x-app-metadata'];
-
-		if (metadataSource) {
-			appMetadata = {
-				...metadataSource,
-				lastEditedBy: user?.username || 'unknown',
-				lastEditedAt: new Date().toISOString(),
-			};
-		} else {
-			appMetadata = {
-				createdBy: user?.username || 'unknown',
-				createdAt: new Date().toISOString(),
-				lastEditedBy: user?.username || 'unknown',
-				lastEditedAt: new Date().toISOString(),
-				notes: [],
-			};
-		}
-
-		const operationForBackend: OperationObject = {
-			...(operationBase as Omit<OperationObject, 'x-app-metadata'>),
-			'x-app-metadata': appMetadata,
-		};
-		const payloadForParent = {
-			path,
-			method,
-			operation: operationForBackend,
-			_lastKnownOperationUpdatedAt:
-				initialEndpoint && !forceOverwrite ? lastKnownOperationUpdatedAt : undefined,
-		};
-
 		try {
-			await onSubmit(payloadForParent);
-		} catch (error) {
-			const apiResponseError = error as ApiResponse<any>;
+			if (endpoint) {
+				if (!lastKnownUpdatedAt && !forceOverwrite)
+					throw new Error('Missing last known update timestamp for concurrency control.');
 
-			if (
-				apiResponseError &&
-				typeof apiResponseError.error === 'string' &&
-				apiResponseError.status === 409
-			) {
-				setConflictDetails({
-					message: apiResponseError.error || 'This endpoint was updated by someone else.',
-					serverUpdatedAt: apiResponseError.errorData?.serverUpdatedAt,
-					lastUpdatedBy: apiResponseError.errorData?.lastUpdatedBy,
-				});
-
-				setIsSubmittingForm(false);
-				return;
-			}
-
-			setIsSubmittingForm(false);
-		}
-	};
-
-	const handleForceSubmitFromDialog = () => {
-		handleSubmit(undefined, true);
-	};
-
-	const handleRefreshAndDiscardEdits = async () => {
-		if (!projectId || !initialEndpoint) return;
-		setIsSubmittingForm(true);
-		setConflictDetails(null);
-
-		try {
-			const specResponse = await api.get<OpenAPISpec>(`/projects/${projectId}/openapi`);
-			if (specResponse.error || !specResponse.data) {
-				throw new Error(specResponse.error || 'Failed to fetch latest spec.');
-			}
-
-			const latestSpec = specResponse.data;
-			const pathItem = latestSpec.paths[initialEndpoint.path];
-
-			if (!pathItem) throw new Error('Endpoint path no longer exists in the latest spec.');
-
-			const latestOperationOrRef = pathItem[
-				initialEndpoint.method.toLowerCase() as keyof typeof pathItem
-			] as OperationObject | ReferenceObject | undefined;
-
-			if (!latestOperationOrRef)
-				throw new Error('Endpoint method no longer exists for this path.');
-
-			const latestResolvedOperation = latestOperationOrRef as OperationObject;
-
-			if (latestResolvedOperation && !(latestResolvedOperation as ReferenceObject).$ref) {
-				const newInitialEndpointData = {
-					path: initialEndpoint.path,
-					method: initialEndpoint.method,
-					operation: latestResolvedOperation,
+				const payload: CorrectedUpdateEndpointDto = {
+					path,
+					method: method as CorrectedUpdateEndpointDto['method'],
+					operation: operationForBackend,
+					lastKnownUpdatedAt: forceOverwrite ? undefined : lastKnownUpdatedAt,
 				};
+				await updateEndpointMutation.mutateAsync({
+					projectId,
+					endpointId: endpoint.id,
+					endpointData: payload as any,
+				});
+				toast({ title: 'Success', description: 'Endpoint updated successfully.' });
+			} else {
+				const payload: CorrectedCreateEndpointDto = {
+					path,
+					method: method as CorrectedCreateEndpointDto['method'],
+					operation: operationForBackend,
+				};
+				await createEndpointMutation.mutateAsync({
+					projectId,
+					endpointData: payload as any,
+				});
+				toast({ title: 'Success', description: 'Endpoint created successfully.' });
+			}
+			onClose();
+		} catch (err) {
+			const error = err as ApiError;
+			if (error?.status === 409 && endpoint) {
+				setConflictDetails({
+					message: error.message || 'This endpoint was updated by someone else.',
+					serverUpdatedAt: (error.errorResponse as any)?.serverUpdatedAt,
+					lastUpdatedBy: (error.errorResponse as any)?.lastUpdatedBy,
+				});
+			} else {
+				const errorMessage =
+					error instanceof ApiError ? error.message : 'Failed to save endpoint.';
+				toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+			}
+		}
+	};
 
-				populateFormFields(newInitialEndpointData);
-				initialEndpointRef.current = newInitialEndpointData;
-				currentInitialEndpointId.current = `${newInitialEndpointData.path}-${newInitialEndpointData.method}`;
-				hasInitializedFromProps.current = true;
-
-				setLastKnownOperationUpdatedAt(
-					latestResolvedOperation['x-app-metadata']?.lastEditedAt,
-				);
+	const handleForceSubmitFromDialog = () => handleSubmit(undefined, true);
+	const handleCloseConflictDialogOnly = () => {
+		setConflictDetails(null);
+		toast({
+			title: 'Conflict Noted',
+			description:
+				'Your edits are still in the form. Please review or copy them before proceeding.',
+			duration: 7000,
+		});
+	};
+	const handleRefreshAndDiscardEdits = async () => {
+		if (!projectId || !endpoint) return;
+		setConflictDetails(null);
+		try {
+			const response = await api.get<EndpointDto>(
+				`/projects/${projectId}/endpoints/${endpoint.id}`,
+			);
+			if (response.data) {
+				populateFormFields(response.data);
 				toast({
 					title: 'Data Refreshed',
 					description:
 						'Form has been updated with the latest server data. Your previous edits were discarded.',
 				});
 			} else {
-				throw new Error(
-					'Could not resolve latest operation to get its timestamp or it was a ref.',
-				);
+				throw new Error('Could not fetch latest endpoint data.');
 			}
-		} catch (error) {
-			toast({
-				title: 'Refresh Failed',
-				description: (error as Error).message,
-				variant: 'destructive',
-			});
-		} finally {
-			setIsSubmittingForm(false);
+		} catch (err) {
+			const errorMessage = err instanceof ApiError ? err.message : 'Refresh failed.';
+			toast({ title: 'Refresh Failed', description: errorMessage, variant: 'destructive' });
 		}
 	};
 
-	const formFieldsDisabled = isSubmittingForm && !conflictDetails;
-	const mainButtonsDisabled = isSubmittingForm || !!conflictDetails;
+	const formFieldsDisabled = isSubmitting && !conflictDetails;
 
 	return (
 		<>
 			<Card className="p-4 max-h-[90vh] overflow-y-auto">
 				<CardHeader>
 					<CardTitle className="text-gradient-green">
-						{initialEndpoint ? 'Edit Endpoint' : 'Create New Endpoint'}
+						{endpoint ? 'Edit Endpoint' : 'Create New Endpoint'}
 					</CardTitle>
 				</CardHeader>
-
 				<CardContent>
 					<form onSubmit={handleSubmit} id={`${formId}-mainForm`} className="space-y-6">
 						<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -755,7 +540,6 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 									disabled={formFieldsDisabled}
 								/>
 							</div>
-
 							<div>
 								<Label htmlFor={`${formId}-method`}>Method</Label>
 								<Select
@@ -766,7 +550,6 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 									<SelectTrigger id={`${formId}-method`}>
 										<SelectValue />
 									</SelectTrigger>
-
 									<SelectContent>
 										<SelectItem value="get">GET</SelectItem>
 										<SelectItem value="post">POST</SelectItem>
@@ -779,7 +562,6 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 								</Select>
 							</div>
 						</div>
-
 						<div>
 							<Label htmlFor={`${formId}-summary`}>Summary</Label>
 							<Input
@@ -790,7 +572,6 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 								disabled={formFieldsDisabled}
 							/>
 						</div>
-
 						<div>
 							<Label htmlFor={`${formId}-description`}>Description</Label>
 							<Textarea
@@ -802,7 +583,6 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 								disabled={formFieldsDisabled}
 							/>
 						</div>
-
 						<div className="space-y-2">
 							<Label htmlFor={`${formId}-tags-input`}>Tags</Label>
 							<div className="flex items-center space-x-2">
@@ -828,7 +608,6 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 									Add Tag
 								</Button>
 							</div>
-
 							{tags.length > 0 && (
 								<div className="flex flex-wrap gap-2 mt-2">
 									{tags.map((tag) => (
@@ -851,7 +630,6 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 								</div>
 							)}
 						</div>
-
 						<div className="flex items-center space-x-2">
 							<Switch
 								id={`${formId}-deprecated`}
@@ -861,14 +639,12 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 							/>
 							<Label htmlFor={`${formId}-deprecated`}>Deprecated</Label>
 						</div>
-
 						<Tabs defaultValue="parameters" className="space-y-4">
 							<TabsList>
 								<TabsTrigger value="parameters">Parameters</TabsTrigger>
 								<TabsTrigger value="requestBody">Request Body</TabsTrigger>
 								<TabsTrigger value="responses">Responses</TabsTrigger>
 							</TabsList>
-
 							<TabsContent value="parameters">
 								<FormParametersSection
 									parameters={parameters}
@@ -878,7 +654,6 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 									isSubmittingForm={formFieldsDisabled}
 								/>
 							</TabsContent>
-
 							<TabsContent value="requestBody">
 								<FormRequestBodySection
 									requestBodyState={requestBodyState}
@@ -888,7 +663,6 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 									formIdPrefix={`${formId}-rb`}
 								/>
 							</TabsContent>
-
 							<TabsContent value="responses">
 								<FormResponsesSection
 									managedResponses={managedResponses}
@@ -902,25 +676,23 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 						</Tabs>
 					</form>
 				</CardContent>
-
 				<CardFooter className="flex justify-end space-x-2">
 					<Button
 						type="button"
 						variant="outline"
 						onClick={onClose}
-						disabled={isSubmittingForm && !!conflictDetails}
+						disabled={isSubmitting && !!conflictDetails}
 					>
 						Cancel
 					</Button>
-
 					<Button
 						type="submit"
 						form={`${formId}-mainForm`}
-						disabled={mainButtonsDisabled}
+						disabled={isSubmitting || !!conflictDetails}
 					>
-						{isSubmittingForm && !conflictDetails
+						{isSubmitting
 							? 'Saving...'
-							: initialEndpoint
+							: endpoint
 								? 'Update Endpoint'
 								: 'Create Endpoint'}
 					</Button>
@@ -930,37 +702,25 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 			{conflictDetails && (
 				<AlertDialog
 					open={!!conflictDetails}
-					onOpenChange={(isOpenDialog) => {
-						if (!isOpenDialog && conflictDetails) {
-							handleCloseConflictDialogOnly();
-						}
-					}}
+					onOpenChange={(isOpen) => !isOpen && setConflictDetails(null)}
 				>
-					<AlertDialogContent className="max-w-screen-lg w-[900px] overflow-y-auto max-h-screen">
+					<AlertDialogContent className="max-w-screen-lg w-[900px]">
 						<AlertDialogHeader>
 							<AlertDialogTitle>Concurrency Conflict</AlertDialogTitle>
-							<AlertDialogDescription className="text-base">
-								<p>{conflictDetails.message}</p>
+							<AlertDialogDescription>
+								<p className="mb-1">{conflictDetails.message}</p>
 								<div className="my-5 leading-relaxed">
 									{conflictDetails.serverUpdatedAt && (
-										<>
-											<p>
-												<strong>Last server update EN:</strong>{' '}
-												{new Date(
-													conflictDetails.serverUpdatedAt,
-												).toLocaleString()}
-											</p>
-											<p>
-												<strong>Last server update FA:</strong>{' '}
-												{new Date(
-													conflictDetails.serverUpdatedAt,
-												).toLocaleString('fa-IR')}
-											</p>
-										</>
+										<p>
+											<strong>Last Server Update:</strong>{' '}
+											{new Date(
+												conflictDetails.serverUpdatedAt,
+											).toLocaleString()}
+										</p>
 									)}
 									{conflictDetails.lastUpdatedBy && (
 										<p className="mt-1">
-											<strong>Last updated by:</strong>{' '}
+											<strong>Last Updated By:</strong>{' '}
 											{conflictDetails.lastUpdatedBy}
 										</p>
 									)}
@@ -970,39 +730,32 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 								</div>
 							</AlertDialogDescription>
 						</AlertDialogHeader>
-
 						<AlertDialogFooter className="flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2 mt-2">
 							<Button
 								className="w-full sm:w-auto"
 								variant="outline"
 								onClick={handleCloseConflictDialogOnly}
-								disabled={isSubmittingForm}
 							>
 								<X className="mr-2 h-4 w-4" /> Review My Edits
 							</Button>
-
 							<Button
 								className="w-full sm:w-auto"
 								variant="secondary"
 								onClick={handleRefreshAndDiscardEdits}
-								disabled={isSubmittingForm}
 							>
-								<RefreshCw className="mr-2 h-4 w-4" /> Refresh & Discard My Edits
+								<RefreshCw className="mr-2 h-4 w-4" /> Refresh & Discard
 							</Button>
-
 							<Button
 								className="w-full sm:w-auto"
 								variant="destructive"
 								onClick={handleForceSubmitFromDialog}
-								disabled={isSubmittingForm}
 							>
-								Force Overwrite With My Edits
+								Force Overwrite
 							</Button>
 						</AlertDialogFooter>
-
 						<AlertDialogCancel
 							onClick={handleCloseConflictDialogOnly}
-							className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+							className="absolute right-4 top-4"
 						>
 							<X className="h-4 w-4" />
 							<span className="sr-only">Close</span>
@@ -1013,4 +766,5 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 		</>
 	);
 };
+
 export default EndpointForm;

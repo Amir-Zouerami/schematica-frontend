@@ -1,22 +1,25 @@
-import { useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { usePermissions } from '@/hooks/usePermissions';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useDeleteProject } from '@/hooks/api/useProjects';
-import ProjectForm from '@/components/projects/ProjectForm';
-import OpenApiEditor from '@/components/openapi/OpenApiEditor';
+
 import CurlConverter from '@/components/endpoints/CurlConverter';
 import EndpointsList from '@/components/endpoints/EndpointsList';
-import { useProject, useOpenApiSpec } from '@/hooks/api/useProject';
+import OpenApiEditor from '@/components/openapi/OpenApiEditor';
 import ProjectAccessForm from '@/components/projects/ProjectAccessForm';
-import { SquareArrowOutUpRight, Download, Edit3, Trash2, Users } from 'lucide-react';
+import ProjectForm from '@/components/projects/ProjectForm';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useEndpoints } from '@/hooks/api/useEndpoints';
+import { useOpenApiSpec, useProject } from '@/hooks/api/useProject';
+import { useDeleteProject } from '@/hooks/api/useProjects';
+import { useToast } from '@/hooks/use-toast';
+import { usePermissions } from '@/hooks/usePermissions';
+import { ApiError } from '@/utils/api';
 import {
-	sanitizeOpenApiSpecForDownload,
 	convertOpenApiToPostmanCollection,
 	convertToYaml,
+	sanitizeOpenApiSpecForDownload,
 } from '@/utils/openApiUtils';
+import { Download, Edit3, SquareArrowOutUpRight, Trash2, Users } from 'lucide-react';
+import { useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import {
 	AlertDialog,
@@ -37,6 +40,7 @@ const ProjectDetailPage = () => {
 
 	const { data: project, isLoading: projectLoading, error: projectError } = useProject(projectId);
 	const { data: openApiSpec, isLoading: specLoading } = useOpenApiSpec(projectId);
+	const { data: endpoints, isLoading: endpointsLoading } = useEndpoints(projectId);
 	const deleteProjectMutation = useDeleteProject();
 
 	const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
@@ -44,21 +48,22 @@ const ProjectDetailPage = () => {
 	const [isOpenApiEditorOpen, setIsOpenApiEditorOpen] = useState(false);
 	const [isEditProjectModalOpen, setIsEditProjectModalOpen] = useState(false);
 
-	const isLoading = projectLoading || specLoading;
+	const isLoading = projectLoading || specLoading || endpointsLoading;
 
 	const handleEditProject = () => setIsEditProjectModalOpen(true);
 	const handleDeleteProject = () => setIsDeleteDialogOpen(true);
 
 	const confirmDeleteProject = async () => {
+		if (!projectId) return;
 		try {
-			await deleteProjectMutation.mutateAsync(projectId!);
+			await deleteProjectMutation.mutateAsync(projectId);
 			toast({
 				title: 'Project Deleted',
 				description: 'The project has been deleted successfully',
 			});
 			navigate('/');
 		} catch (err) {
-			const errorMessage = err instanceof Error ? err.message : 'Failed to delete project';
+			const errorMessage = err instanceof ApiError ? err.message : 'Failed to delete project';
 			toast({ title: 'Delete Failed', description: errorMessage, variant: 'destructive' });
 		} finally {
 			setIsDeleteDialogOpen(false);
@@ -184,10 +189,8 @@ const ProjectDetailPage = () => {
 					<Skeleton className="h-10 w-3/5" />
 					<Skeleton className="h-9 w-24" />
 				</div>
-
 				<Skeleton className="h-16 w-full" />
 				<Skeleton className="h-10 w-full" />
-
 				<div className="space-y-4 mt-8">
 					<Skeleton className="h-8 w-1/3" />
 					<Skeleton className="h-24 w-full" />
@@ -201,13 +204,11 @@ const ProjectDetailPage = () => {
 		return (
 			<div className="text-center py-10 px-4">
 				<h2 className="text-2xl font-bold text-red-500 mb-4">Error Loading Project</h2>
-
 				<p className="text-muted-foreground mb-6">
-					{projectError instanceof Error
+					{projectError instanceof ApiError
 						? projectError.message
-						: `Project with ID ${projectId} not found.`}
+						: `An error occurred or the project with ID ${projectId} was not found.`}
 				</p>
-
 				<Button onClick={() => navigate('/')}>Back to Projects</Button>
 			</div>
 		);
@@ -215,6 +216,7 @@ const ProjectDetailPage = () => {
 
 	return (
 		<div className="space-y-6">
+			{/* ... project header and links ... */}
 			<div className="flex flex-col md:flex-row gap-4 md:items-center justify-between mt-4 mb-12">
 				<div>
 					<h1
@@ -223,8 +225,7 @@ const ProjectDetailPage = () => {
 					>
 						{project.name}
 					</h1>
-
-					{project.description && (
+					{typeof project.description === 'string' && project.description && (
 						<p
 							className="text-muted-foreground mt-3 whitespace-pre-line max-w-[1200px]"
 							style={{ unicodeBidi: 'plaintext' }}
@@ -243,7 +244,6 @@ const ProjectDetailPage = () => {
 							>
 								<Users className="h-4 w-4 mr-2" /> Manage Access
 							</Button>
-
 							<Button
 								variant="outline"
 								className="w-full sm:w-auto md:w-full"
@@ -251,7 +251,6 @@ const ProjectDetailPage = () => {
 							>
 								<Edit3 className="h-4 w-4 mr-2" /> Edit Project
 							</Button>
-
 							<Button
 								variant="destructive"
 								className="w-full sm:w-auto md:w-full"
@@ -263,14 +262,12 @@ const ProjectDetailPage = () => {
 					)}
 				</div>
 			</div>
-
-			{project.serverUrl && (
+			{typeof project.serverUrl === 'string' && project.serverUrl && (
 				<div className="bg-secondary/40 rounded-lg p-4">
 					<div className="text-sm text-muted-foreground mb-1">Base Server URL:</div>
 					<code className="font-mono text-sm break-all">{project.serverUrl}</code>
 				</div>
 			)}
-
 			{project.links && project.links.length > 0 && (
 				<div className="flex flex-wrap gap-2">
 					{project.links.map((link, index) => (
@@ -295,7 +292,6 @@ const ProjectDetailPage = () => {
 
 			<div className="flex flex-wrap justify-between items-center gap-4 !mt-12">
 				<h2 className="text-2xl font-bold text-gradient-green">API Documentation</h2>
-
 				<div className="flex flex-wrap gap-2">
 					<Button
 						variant="outline"
@@ -304,7 +300,6 @@ const ProjectDetailPage = () => {
 					>
 						<Download className="h-4 w-4 mr-2" /> OpenAPI (JSON)
 					</Button>
-
 					<Button
 						variant="outline"
 						onClick={handleDownloadOpenApiSpecYaml}
@@ -312,7 +307,6 @@ const ProjectDetailPage = () => {
 					>
 						<Download className="h-4 w-4 mr-2" /> OpenAPI (YAML)
 					</Button>
-
 					<Button
 						variant="outline"
 						onClick={handleDownloadPostmanCollection}
@@ -320,12 +314,11 @@ const ProjectDetailPage = () => {
 					>
 						<Download className="h-4 w-4 mr-2" /> Postman
 					</Button>
-
 					{isProjectOwner(project) && (
 						<Button
 							variant="outline"
 							onClick={() => setIsOpenApiEditorOpen(true)}
-							disabled={!openApiSpec}
+							disabled={!isProjectOwner(project)}
 						>
 							<Edit3 className="h-4 w-4 mr-2" /> Edit Open API
 						</Button>
@@ -340,59 +333,55 @@ const ProjectDetailPage = () => {
 					</div>
 				)}
 				{openApiSpec ? (
+					// **FIX: Removed the incorrect endpointIdMap prop**
 					<EndpointsList openApiSpec={openApiSpec} projectId={projectId || ''} />
 				) : (
 					!isLoading && (
 						<p className="text-muted-foreground text-center py-8">
-							No API specification loaded for this project.
+							No API specification loaded for this project. Admins can import one
+							using the "Edit Open API" button.
 						</p>
 					)
 				)}
 			</div>
 
-			{isEditProjectModalOpen && project && (
+			{isEditProjectModalOpen && (
 				<ProjectForm
 					open={isEditProjectModalOpen}
 					onClose={() => setIsEditProjectModalOpen(false)}
 					project={project}
 				/>
 			)}
-
-			{isAccessModalOpen && project && (
+			{isAccessModalOpen && (
 				<ProjectAccessForm
 					project={project}
 					isOpen={isAccessModalOpen}
 					onClose={() => setIsAccessModalOpen(false)}
 				/>
 			)}
-
-			{isOpenApiEditorOpen && openApiSpec && project && (
+			{isOpenApiEditorOpen && project && (
 				<OpenApiEditor
 					projectId={projectId || ''}
-					openApi={openApiSpec}
+					openApi={openApiSpec || {}}
 					projectUpdatedAt={project.updatedAt}
 					isOpen={isOpenApiEditorOpen}
 					onClose={() => setIsOpenApiEditorOpen(false)}
 				/>
 			)}
-
 			{isDeleteDialogOpen && project && (
 				<AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
 					<AlertDialogContent className="max-w-3xl">
 						<AlertDialogHeader>
 							<AlertDialogTitle>Are you sure?</AlertDialogTitle>
-
 							<AlertDialogDescription className="py-1 leading-6">
 								This will permanently delete the project "{project.name}" and all of
 								its endpoints. This action cannot be undone.
 							</AlertDialogDescription>
 						</AlertDialogHeader>
-
 						<AlertDialogFooter>
 							<AlertDialogCancel disabled={deleteProjectMutation.isPending}>
 								Cancel
 							</AlertDialogCancel>
-
 							<AlertDialogAction
 								onClick={confirmDeleteProject}
 								disabled={deleteProjectMutation.isPending}

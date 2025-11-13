@@ -1,10 +1,21 @@
-import { useState } from 'react';
+import { useCreateTeam, useDeleteTeam, useTeams, useUpdateTeam } from '@/hooks/api/useTeams';
 import { useToast } from '@/hooks/use-toast';
-import { Input } from '@/components/ui/input';
+import type { components } from '@/types/api-types';
+import { ApiError } from '@/utils/api';
+import { Edit, PlusCircle, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+
 import { Button } from '@/components/ui/button';
-import { Trash2, Edit, PlusCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useTeams, useCreateTeam, useUpdateTeam, useDeleteTeam } from '@/hooks/api/useTeams';
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import {
 	Table,
 	TableBody,
@@ -13,17 +24,12 @@ import {
 	TableHeader,
 	TableRow,
 } from '@/components/ui/table';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-	DialogDescription,
-	DialogFooter,
-} from '@/components/ui/dialog';
+
+type TeamDto = components['schemas']['TeamDto'];
 
 const TeamManagement = () => {
-	const { data: teams = [], isLoading } = useTeams();
+	const { data: response, isLoading, error } = useTeams();
+	const teams = response?.data || [];
 	const { toast } = useToast();
 
 	const createTeamMutation = useCreateTeam();
@@ -35,8 +41,8 @@ const TeamManagement = () => {
 	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
 	const [newTeamName, setNewTeamName] = useState('');
-	const [editingTeam, setEditingTeam] = useState<{ id: string; name: string } | null>(null);
-	const [deletingTeam, setDeletingTeam] = useState<{ id: string; name: string } | null>(null);
+	const [editingTeam, setEditingTeam] = useState<TeamDto | null>(null);
+	const [deletingTeam, setDeletingTeam] = useState<TeamDto | null>(null);
 
 	const handleCreate = async () => {
 		if (!newTeamName.trim()) {
@@ -49,17 +55,18 @@ const TeamManagement = () => {
 			return;
 		}
 		try {
-			await createTeamMutation.mutateAsync(newTeamName);
+			await createTeamMutation.mutateAsync({ name: newTeamName });
 			toast({ title: 'Success', description: 'Team created successfully.' });
 
 			setIsCreateDialogOpen(false);
 			setNewTeamName('');
-		} catch (error: any) {
-			toast({ title: 'Error', description: error.message, variant: 'destructive' });
+		} catch (err) {
+			const errorMessage = err instanceof ApiError ? err.message : 'Failed to create team.';
+			toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
 		}
 	};
 
-	const handleEdit = (team: { id: string; name: string }) => {
+	const handleEdit = (team: TeamDto) => {
 		setEditingTeam(team);
 		setNewTeamName(team.name);
 		setIsEditDialogOpen(true);
@@ -76,18 +83,22 @@ const TeamManagement = () => {
 		}
 
 		try {
-			await updateTeamMutation.mutateAsync({ teamId: editingTeam.id, newName: newTeamName });
+			await updateTeamMutation.mutateAsync({
+				teamId: editingTeam.id,
+				teamData: { name: newTeamName },
+			});
 
 			toast({ title: 'Success', description: 'Team updated successfully.' });
 			setIsEditDialogOpen(false);
 			setEditingTeam(null);
 			setNewTeamName('');
-		} catch (error: any) {
-			toast({ title: 'Error', description: error.message, variant: 'destructive' });
+		} catch (err) {
+			const errorMessage = err instanceof ApiError ? err.message : 'Failed to update team.';
+			toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
 		}
 	};
 
-	const handleDelete = (team: { id: string; name: string }) => {
+	const handleDelete = (team: TeamDto) => {
 		setDeletingTeam(team);
 		setIsDeleteDialogOpen(true);
 	};
@@ -101,10 +112,27 @@ const TeamManagement = () => {
 			toast({ title: 'Success', description: 'Team deleted successfully.' });
 			setIsDeleteDialogOpen(false);
 			setDeletingTeam(null);
-		} catch (error: any) {
-			toast({ title: 'Error', description: error.message, variant: 'destructive' });
+		} catch (err) {
+			const errorMessage = err instanceof ApiError ? err.message : 'Failed to delete team.';
+			toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
 		}
 	};
+
+	if (error) {
+		return (
+			<Card>
+				<CardHeader>
+					<CardTitle>Teams</CardTitle>
+				</CardHeader>
+				<CardContent>
+					<p className="text-destructive">
+						Failed to load teams:{' '}
+						{error instanceof ApiError ? error.message : error.message}
+					</p>
+				</CardContent>
+			</Card>
+		);
+	}
 
 	return (
 		<Card>

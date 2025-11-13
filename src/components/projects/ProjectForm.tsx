@@ -1,13 +1,20 @@
-import { api } from '@/utils/api';
-import { Project } from '@/types/types';
-import { X, RefreshCw } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import React, { useState, useEffect, useRef } from 'react';
 import { useCreateProject, useUpdateProject } from '@/hooks/api/useProjects';
+import { useToast } from '@/hooks/use-toast';
+import type { components } from '@/types/api-types';
+import { api, ApiError } from '@/utils/api';
+import { RefreshCw, X } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+
+import {
+	AlertDialog,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Button } from '@/components/ui/button';
 import {
 	Dialog,
 	DialogContent,
@@ -16,38 +23,31 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
-import {
-	AlertDialog,
-	AlertDialogTitle,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-} from '@/components/ui/alert-dialog';
-
-interface ProjectLink {
-	name: string;
-	url: string;
-}
+type ProjectDetailDto = components['schemas']['ProjectDetailDto'];
+type ProjectLinkDto = components['schemas']['ProjectLinkDto'];
+type CreateProjectDto = components['schemas']['CreateProjectDto'];
+type UpdateProjectDto = components['schemas']['UpdateProjectDto'];
 
 interface ProjectFormProps {
 	open: boolean;
 	onClose: () => void;
-	project?: Project;
+	project?: ProjectDetailDto;
 }
 
 const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => {
 	const { toast } = useToast();
-	const initialProjectRef = useRef<Project | undefined>(undefined);
+	const initialProjectRef = useRef<ProjectDetailDto | undefined>(undefined);
 	const hasInitializedFromProps = useRef(false);
 	const currentProjectIdentifier = useRef<string | null>(null);
 
 	const [name, setName] = useState('');
 	const [description, setDescription] = useState('');
 	const [serverUrl, setServerUrl] = useState('');
-	const [links, setLinks] = useState<ProjectLink[]>([{ name: '', url: '' }]);
+	const [links, setLinks] = useState<Omit<ProjectLinkDto, 'id'>[]>([{ name: '', url: '' }]);
 
 	const createProjectMutation = useCreateProject();
 	const updateProjectMutation = useUpdateProject();
@@ -59,13 +59,19 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 		undefined,
 	);
 
-	const populateFormFields = (currentProjectData: Project | undefined) => {
+	const populateFormFields = (currentProjectData: ProjectDetailDto | undefined) => {
 		setName(currentProjectData?.name || '');
-		setDescription(currentProjectData?.description || '');
-		setServerUrl(currentProjectData?.serverUrl || '');
+		setDescription(
+			typeof currentProjectData?.description === 'string'
+				? currentProjectData.description
+				: '',
+		);
+		setServerUrl(
+			typeof currentProjectData?.serverUrl === 'string' ? currentProjectData.serverUrl : '',
+		);
 		setLinks(
 			currentProjectData?.links && currentProjectData.links.length > 0
-				? structuredClone(currentProjectData.links)
+				? JSON.parse(JSON.stringify(currentProjectData.links))
 				: [{ name: '', url: '' }],
 		);
 		setLastKnownUpdatedAt(currentProjectData?.updatedAt);
@@ -86,7 +92,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 				initialProjectRef.current = project;
 				currentProjectIdentifier.current = newProjectSessionId;
 				hasInitializedFromProps.current = true;
-
 				setConflictError(null);
 				setServerVersionTimestamp(undefined);
 			}
@@ -106,7 +111,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 		setLinks((prevLinks) => {
 			const newLinks = [...prevLinks];
 			newLinks[index] = { ...newLinks[index], [field]: value };
-
 			return newLinks;
 		});
 	};
@@ -133,24 +137,30 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 		}
 
 		const filteredLinks = links.filter((link) => link.name.trim() && link.url.trim());
-		const payload: any = {
-			name,
-			description,
-			serverUrl,
-			links: filteredLinks,
-		};
-
-		if (project && lastKnownUpdatedAt && !forceOverwrite) {
-			payload.lastKnownUpdatedAt = lastKnownUpdatedAt;
-		}
 
 		try {
 			if (project) {
+				if (!lastKnownUpdatedAt && !forceOverwrite) {
+					throw new Error('Missing last known update timestamp.');
+				}
+				const payload: UpdateProjectDto = {
+					name,
+					description,
+					serverUrl,
+					links: filteredLinks,
+					lastKnownUpdatedAt: forceOverwrite ? undefined : lastKnownUpdatedAt,
+				};
 				await updateProjectMutation.mutateAsync({
 					projectId: project.id,
 					projectData: payload,
 				});
 			} else {
+				const payload: CreateProjectDto = {
+					name,
+					description,
+					serverUrl,
+					links: filteredLinks,
+				};
 				await createProjectMutation.mutateAsync(payload);
 			}
 
@@ -160,28 +170,22 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 						? 'Project Overwritten'
 						: 'Project Updated'
 					: 'Project Created',
-				description: project
-					? `${name} has been successfully ${forceOverwrite ? 'overwritten' : 'updated'}`
-					: `${name} has been successfully created`,
+				description: `${name} has been successfully saved.`,
 			});
 
 			onClose();
-		} catch (error: any) {
+		} catch (err) {
+			const error = err as ApiError;
 			if (error?.status === 409 && project) {
-				setServerVersionTimestamp(error.errorData?.serverUpdatedAt);
+				setServerVersionTimestamp((error.errorResponse as any)?.serverUpdatedAt);
 				setConflictError(
-					error.error || 'This project was updated by someone else. Please review.',
+					error.message || 'This project was updated by someone else. Please review.',
 				);
 				return;
 			}
-
-			toast({
-				title: 'Error',
-				description:
-					error?.error ||
-					(error instanceof Error ? error.message : 'Failed to save project'),
-				variant: 'destructive',
-			});
+			const errorMessage =
+				error instanceof ApiError ? error.message : 'Failed to save project.';
+			toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
 		}
 	};
 
@@ -192,15 +196,12 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 	const handleRefreshAndDiscardEdits = async () => {
 		if (!project?.id) return;
 
-		const tempSubmittingStateSetter = (val: boolean) =>
-			((updateProjectMutation.isPending as any) = (createProjectMutation.isPending as any) =
-				val);
-
-		tempSubmittingStateSetter(true);
+		updateProjectMutation.reset();
+		createProjectMutation.reset();
 		setConflictError(null);
 
 		try {
-			const response = await api.get<Project>(`/projects/${project.id}`);
+			const response = await api.get<ProjectDetailDto>(`/projects/${project.id}`);
 			if (response.data) {
 				populateFormFields(response.data);
 				initialProjectRef.current = response.data;
@@ -214,20 +215,11 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 						'Form has been updated with the latest server data. Your previous edits were discarded.',
 				});
 			} else {
-				toast({
-					title: 'Refresh Failed',
-					description: response.error || 'Could not fetch latest project data.',
-					variant: 'destructive',
-				});
+				throw new Error('Could not fetch latest project data.');
 			}
-		} catch (error) {
-			toast({
-				title: 'Refresh Failed',
-				description: (error as Error).message,
-				variant: 'destructive',
-			});
-		} finally {
-			tempSubmittingStateSetter(false);
+		} catch (err) {
+			const errorMessage = err instanceof ApiError ? err.message : 'Refresh failed.';
+			toast({ title: 'Refresh Failed', description: errorMessage, variant: 'destructive' });
 		}
 	};
 
@@ -246,11 +238,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 			<Dialog
 				open={open}
 				onOpenChange={(isOpenDialog) => {
-					if (!isOpenDialog) {
-						if (!isSubmitting) {
-							onClose();
-						}
-					}
+					if (!isOpenDialog && !isSubmitting) onClose();
 				}}
 			>
 				<DialogContent className="max-w-3xl glass-card">
@@ -277,7 +265,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 								disabled={isSubmitting}
 							/>
 						</div>
-
 						<div className="space-y-2">
 							<Label htmlFor="description">Description</Label>
 							<Textarea
@@ -289,7 +276,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 								disabled={isSubmitting}
 							/>
 						</div>
-
 						<div className="space-y-2">
 							<Label htmlFor="serverUrl">Base Server URL</Label>
 							<Input
@@ -300,7 +286,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 								disabled={isSubmitting}
 							/>
 						</div>
-
 						<div className="space-y-2">
 							<div className="flex justify-between items-center mb-2">
 								<Label>Related Links</Label>
@@ -325,7 +310,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 										className="flex-1"
 										disabled={isSubmitting}
 									/>
-
 									<Input
 										placeholder="URL (e.g., https://staging.api.com)"
 										value={link.url}
@@ -335,27 +319,19 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 										className="flex-1"
 										disabled={isSubmitting}
 									/>
-
 									<Button
 										type="button"
 										variant="destructive"
 										size="icon"
 										onClick={() => handleRemoveLink(index)}
 										className="h-9 w-9"
-										disabled={isSubmitting}
+										disabled={isSubmitting || links.length <= 1}
 									>
 										<X className="h-4 w-4" />
 									</Button>
 								</div>
 							))}
-
-							{links.length === 0 && (
-								<p className="text-xs text-muted-foreground text-center">
-									No related links added.
-								</p>
-							)}
 						</div>
-
 						<DialogFooter className="pt-4">
 							<Button
 								type="button"
@@ -365,7 +341,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 							>
 								Cancel
 							</Button>
-
 							<Button type="submit" disabled={isSubmitting || !!conflictError}>
 								{isSubmitting
 									? project
@@ -384,30 +359,20 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 				<AlertDialog
 					open={!!conflictError}
 					onOpenChange={(isOpenDialog) => {
-						if (!isOpenDialog) {
-							setConflictError(null);
-						}
+						if (!isOpenDialog) setConflictError(null);
 					}}
 				>
-					<AlertDialogContent className="max-w-screen-lg w-[900px] overflow-y-auto max-h-screen">
+					<AlertDialogContent className="max-w-5xl w-[900px]">
 						<AlertDialogHeader>
 							<AlertDialogTitle>Concurrency Conflict</AlertDialogTitle>
 							<AlertDialogDescription>
 								<p className="mb-1">{conflictError}</p>
 								<div className="my-5 leading-relaxed">
 									{serverVersionTimestamp && (
-										<>
-											<p>
-												<strong>Last server update EN:</strong>{' '}
-												{new Date(serverVersionTimestamp).toLocaleString()}
-											</p>
-											<p>
-												<strong>Last server update FA:</strong>{' '}
-												{new Date(serverVersionTimestamp).toLocaleString(
-													'fa-IR',
-												)}
-											</p>
-										</>
+										<p>
+											<strong>Last Server Update:</strong>{' '}
+											{new Date(serverVersionTimestamp).toLocaleString()}
+										</p>
 									)}
 									<p className="mt-2">
 										Your current unsaved edits are still in the form.
@@ -415,7 +380,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 								</div>
 							</AlertDialogDescription>
 						</AlertDialogHeader>
-
 						<AlertDialogFooter className="flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2 mt-2">
 							<Button
 								className="w-full sm:w-auto"
@@ -424,7 +388,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 							>
 								<X className="mr-2 h-4 w-4" /> Review My Edits
 							</Button>
-
 							<Button
 								className="w-full sm:w-auto"
 								variant="secondary"
@@ -432,7 +395,6 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 							>
 								<RefreshCw className="mr-2 h-4 w-4" /> Refresh & Discard My Edits
 							</Button>
-
 							<Button
 								className="w-full sm:w-auto"
 								variant="destructive"
@@ -441,8 +403,10 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ open, onClose, project }) => 
 								Force Overwrite With My Edits
 							</Button>
 						</AlertDialogFooter>
-
-						<AlertDialogCancel className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+						<AlertDialogCancel
+							onClick={handleCloseConflictDialogOnly}
+							className="absolute right-4 top-4"
+						>
 							<X className="h-4 w-4" />
 							<span className="sr-only">Close</span>
 						</AlertDialogCancel>

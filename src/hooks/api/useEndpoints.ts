@@ -1,6 +1,40 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { OperationObject } from '@/types/types';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/utils/api';
+import type { components } from '@/types/api-types';
+
+type EndpointSummaryDto = components['schemas']['EndpointSummaryDto'];
+type CreateEndpointDto = components['schemas']['CreateEndpointDto'];
+type UpdateEndpointDto = components['schemas']['UpdateEndpointDto'];
+type EndpointDto = components['schemas']['EndpointDto'];
+
+export const useEndpoints = (projectId: string | undefined) => {
+	return useQuery({
+		queryKey: ['endpoints', projectId],
+		queryFn: async () => {
+			if (!projectId) return null;
+			const response = await api.get<{ data: EndpointSummaryDto[] }>(
+				`/projects/${projectId}/endpoints`,
+				{ params: { limit: 1000 } },
+			);
+			return response.data.data;
+		},
+		enabled: !!projectId,
+	});
+};
+
+export const useEndpoint = (projectId: string | undefined, endpointId: string | undefined) => {
+	return useQuery({
+		queryKey: ['endpoint', projectId, endpointId],
+		queryFn: async () => {
+			if (!projectId || !endpointId) return null;
+			const response = await api.get<EndpointDto>(
+				`/projects/${projectId}/endpoints/${endpointId}`,
+			);
+			return response.data;
+		},
+		enabled: !!projectId && !!endpointId,
+	});
+};
 
 export const useCreateEndpoint = () => {
 	const queryClient = useQueryClient();
@@ -11,17 +45,16 @@ export const useCreateEndpoint = () => {
 			endpointData,
 		}: {
 			projectId: string;
-			endpointData: any;
+			endpointData: CreateEndpointDto;
 		}) => {
-			const response = await api.post(`/projects/${projectId}/endpoints`, endpointData);
-
-			if (response.error) {
-				throw new Error(response.error);
-			}
-
+			const response = await api.post<EndpointDto>(
+				`/projects/${projectId}/endpoints`,
+				endpointData,
+			);
 			return response.data;
 		},
 		onSuccess: (data, variables) => {
+			queryClient.invalidateQueries({ queryKey: ['endpoints', variables.projectId] });
 			queryClient.invalidateQueries({ queryKey: ['openapi', variables.projectId] });
 			queryClient.invalidateQueries({ queryKey: ['project', variables.projectId] });
 		},
@@ -34,45 +67,24 @@ export const useUpdateEndpoint = () => {
 	return useMutation({
 		mutationFn: async ({
 			projectId,
-			originalPath,
-			originalMethod,
-			newPath,
-			newMethod,
-			operation,
-			lastKnownOperationUpdatedAt,
+			endpointId,
+			endpointData,
 		}: {
 			projectId: string;
-			originalPath: string;
-			originalMethod: string;
-			newPath: string;
-			newMethod: string;
-			operation: OperationObject;
-			lastKnownOperationUpdatedAt?: string;
+			endpointId: string;
+			endpointData: UpdateEndpointDto;
 		}) => {
-			const apiPayload: any = {
-				originalPath,
-				originalMethod,
-				newPath,
-				newMethod,
-				operation,
-			};
-
-			if (lastKnownOperationUpdatedAt) {
-				apiPayload.lastKnownOperationUpdatedAt = lastKnownOperationUpdatedAt;
-			}
-
-			const response = await api.put<{ operation: OperationObject }>(
-				`/projects/${projectId}/endpoints`,
-				apiPayload,
+			const response = await api.put<EndpointDto>(
+				`/projects/${projectId}/endpoints/${endpointId}`,
+				endpointData,
 			);
-
-			if (response.error) {
-				throw response;
-			}
-
 			return response.data;
 		},
 		onSuccess: (data, variables) => {
+			queryClient.invalidateQueries({
+				queryKey: ['endpoint', variables.projectId, variables.endpointId],
+			});
+			queryClient.invalidateQueries({ queryKey: ['endpoints', variables.projectId] });
 			queryClient.invalidateQueries({ queryKey: ['openapi', variables.projectId] });
 			queryClient.invalidateQueries({ queryKey: ['project', variables.projectId] });
 		},
@@ -85,24 +97,16 @@ export const useDeleteEndpoint = () => {
 	return useMutation({
 		mutationFn: async ({
 			projectId,
-			path,
-			method,
+			endpointId,
 		}: {
 			projectId: string;
-			path: string;
-			method: string;
+			endpointId: string;
 		}) => {
-			const response = await api.delete(`/projects/${projectId}/endpoints`, {
-				body: { path, method },
-			});
-
-			if (response.error) {
-				throw new Error(response.error);
-			}
-
-			return response.data;
+			await api.delete<null>(`/projects/${projectId}/endpoints/${endpointId}`);
+			return endpointId;
 		},
 		onSuccess: (data, variables) => {
+			queryClient.invalidateQueries({ queryKey: ['endpoints', variables.projectId] });
 			queryClient.invalidateQueries({ queryKey: ['openapi', variables.projectId] });
 			queryClient.invalidateQueries({ queryKey: ['project', variables.projectId] });
 		},

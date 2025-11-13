@@ -1,6 +1,6 @@
-import { api } from '@/utils/api';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { components } from '@/types/api-types';
+import { api } from '@/utils/api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 type UserDto = components['schemas']['UserDto'];
 type UpdateUserDto = components['schemas']['UpdateUserDto'];
@@ -29,6 +29,17 @@ export const useUpdateUser = () => {
 	return useMutation({
 		mutationFn: ({ userId, userData }: { userId: string; userData: UpdateUserDto }) =>
 			api.put<UserDto>(`/admin/users/${userId}`, userData),
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: ADMIN_USERS_QUERY_KEY });
+		},
+	});
+};
+
+export const useUpdateUserProfilePictureAdmin = () => {
+	const queryClient = useQueryClient();
+	return useMutation({
+		mutationFn: ({ userId, fileData }: { userId: string; fileData: FormData }) =>
+			api.put<UserDto>(`/admin/users/${userId}/picture`, fileData),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ADMIN_USERS_QUERY_KEY });
 		},

@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
-import { AlertCircle } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { ApiError } from '@/utils/api';
+import { AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import {
 	Card,
 	CardContent,
@@ -14,6 +14,8 @@ import {
 	CardHeader,
 	CardTitle,
 } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 const LoginForm = () => {
 	const [username, setUsername] = useState('');
@@ -36,7 +38,13 @@ const LoginForm = () => {
 			await login(username, password);
 			navigate(redirectTo, { replace: true });
 		} catch (err) {
-			setError(err instanceof Error ? err.message : 'Login failed');
+			if (err instanceof ApiError) {
+				setError(err.message);
+			} else if (err instanceof Error) {
+				setError(err.message);
+			} else {
+				setError('An unexpected error occurred during login.');
+			}
 		} finally {
 			setIsLoading(false);
 		}

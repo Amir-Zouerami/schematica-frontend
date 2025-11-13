@@ -1,23 +1,6 @@
-import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
-import { useTeams } from '@/hooks/api/useTeams';
-import { useUsers } from '@/hooks/api/useUsers';
-import React, { useState, useEffect } from 'react';
-import { useUpdateProject } from '@/hooks/api/useProjects';
-import { Project, AccessControlList } from '@/types/types';
-import { X, ChevronsUpDown, Users as TeamsIcon } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-	DialogDescription,
-	DialogFooter,
-} from '@/components/ui/dialog';
 import {
 	Command,
 	CommandEmpty,
@@ -26,9 +9,40 @@ import {
 	CommandItem,
 	CommandList,
 } from '@/components/ui/command';
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from '@/components/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
+import { useUpdateProjectAccess } from '@/hooks/api/useProjects';
+import { useTeams } from '@/hooks/api/useTeams';
+import { useUsers } from '@/hooks/api/useUsers';
+import { useToast } from '@/hooks/use-toast';
+import type { components } from '@/types/api-types';
+import { ApiError } from '@/utils/api';
+import { ChevronsUpDown, Users as TeamsIcon, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+
+// Correctly imported types
+type ProjectDetailDto = components['schemas']['ProjectDetailDto'];
+type UpdateAccessDto = components['schemas']['UpdateAccessDto'];
+type SanitizedUserDto = components['schemas']['SanitizedUserDto'];
+type TeamDto = components['schemas']['TeamDto'];
+
+// Stricter local type for state management
+interface AccessControlState {
+	owners: { users: string[]; teams: string[] };
+	viewers: { users: string[]; teams: string[] };
+	deniedUsers: string[];
+}
 
 interface ProjectAccessFormProps {
-	project: Project;
+	project: ProjectDetailDto;
 	isOpen: boolean;
 	onClose: () => void;
 }
@@ -67,7 +81,6 @@ const Selector = ({
 
 					<CommandList>
 						<CommandEmpty>No results found.</CommandEmpty>
-
 						<CommandGroup>
 							{availableItems.map((item) => (
 								<CommandItem
@@ -90,78 +103,94 @@ const Selector = ({
 };
 
 const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, onClose }) => {
-	const { data: allUsers = [] } = useUsers();
-	const { data: allTeams = [] } = useTeams();
+	const { data: usersResponse } = useUsers();
+	const { data: teamsResponse } = useTeams();
+	const allUsers = usersResponse?.data || [];
+	const allTeams = teamsResponse?.data || [];
 
 	const { toast } = useToast();
-	const updateProjectMutation = useUpdateProject();
+	const updateAccessMutation = useUpdateProjectAccess();
 
-	const [access, setAccess] = useState<AccessControlList>({
+	const [access, setAccess] = useState<AccessControlState>({
 		owners: { users: [], teams: [] },
-		allow: { users: [], teams: [] },
-		deny: { users: [] },
+		viewers: { users: [], teams: [] },
+		deniedUsers: [],
 	});
 
 	useEffect(() => {
 		if (project.access) {
-			setAccess(JSON.parse(JSON.stringify(project.access)));
+			setAccess(JSON.parse(JSON.stringify(project.access as unknown as AccessControlState)));
 		}
 	}, [project.access, isOpen]);
 
-	const getUserById = (id: string) => allUsers.find((u) => u.id === id);
+	const getUserById = (id: string): SanitizedUserDto | undefined =>
+		allUsers.find((u) => u.id === id);
 
 	const handleModify = (
 		action: 'add' | 'remove',
-		list: keyof AccessControlList,
+		list: keyof AccessControlState,
 		type: 'users' | 'teams',
 		value: string,
 	) => {
 		setAccess((prev) => {
-			const newAccess = JSON.parse(JSON.stringify(prev));
-			const currentList = (newAccess[list] as any)[type] as string[];
+			const newAccess = { ...prev };
 
-			if (action === 'add' && !currentList.includes(value)) {
-				currentList.push(value);
-			} else if (action === 'remove') {
-				(newAccess[list] as any)[type] = currentList.filter((item) => item !== value);
+			if (type === 'teams' && list !== 'deniedUsers') {
+				const currentList = newAccess[list].teams;
+				if (action === 'add' && !currentList.includes(value)) {
+					newAccess[list].teams = [...currentList, value];
+				} else if (action === 'remove') {
+					newAccess[list].teams = currentList.filter((item) => item !== value);
+				}
+			} else if (type === 'users') {
+				const listKey = list as 'owners' | 'viewers' | 'deniedUsers';
+				const currentList =
+					listKey === 'deniedUsers' ? newAccess.deniedUsers : newAccess[listKey].users;
+
+				if (action === 'add' && !currentList.includes(value)) {
+					if (listKey === 'deniedUsers') newAccess.deniedUsers = [...currentList, value];
+					else newAccess[listKey].users = [...currentList, value];
+				} else if (action === 'remove') {
+					const filteredList = currentList.filter((item) => item !== value);
+					if (listKey === 'deniedUsers') newAccess.deniedUsers = filteredList;
+					else newAccess[listKey].users = filteredList;
+				}
 			}
-
 			return newAccess;
 		});
 	};
 
 	const handleSubmit = async () => {
 		try {
-			const projectData = {
-				name: project.name,
-				description: project.description,
-				serverUrl: project.serverUrl,
-				links: project.links,
-				access,
+			const accessData: UpdateAccessDto = {
+				...access,
+				lastKnownUpdatedAt: project.updatedAt,
 			};
 
-			await updateProjectMutation.mutateAsync({ projectId: project.id, projectData });
+			await updateAccessMutation.mutateAsync({ projectId: project.id, accessData });
 
 			toast({ title: 'Success', description: 'Project access updated successfully.' });
 			onClose();
-		} catch (error: any) {
+		} catch (err) {
+			const errorMessage =
+				err instanceof ApiError ? err.message : 'Failed to update project access.';
 			toast({
 				title: 'Error',
-				description: error.error || 'Failed to update project access.',
+				description: errorMessage,
 				variant: 'destructive',
 			});
 		}
 	};
 
-	const renderAccessList = (title: string, list: keyof Omit<AccessControlList, 'deny'>) => {
+	const renderAccessList = (title: string, list: 'owners' | 'viewers') => {
 		const userItems = access[list].users;
 		const teamItems = access[list].teams;
 		const allAssignedUserIds = [
 			...access.owners.users,
-			...access.allow.users,
-			...access.deny.users,
+			...access.viewers.users,
+			...access.deniedUsers,
 		];
-		const allAssignedTeamIds = [...access.owners.teams, ...access.allow.teams];
+		const allAssignedTeamIds = [...access.owners.teams, ...access.viewers.teams];
 
 		return (
 			<Card>
@@ -197,7 +226,14 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 											<TableRow key={`user-${userId}`}>
 												<TableCell className="flex items-center gap-2 py-2">
 													<Avatar className="h-6 w-6">
-														<AvatarImage src={user?.profileImage} />
+														<AvatarImage
+															src={
+																typeof user?.profileImage ===
+																'string'
+																	? user.profileImage
+																	: undefined
+															}
+														/>
 														<AvatarFallback className="text-xs">
 															{user?.username
 																.substring(0, 2)
@@ -271,7 +307,7 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 	return (
 		<Dialog open={isOpen} onOpenChange={onClose}>
 			<DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-				<DialogHeader className="flex-shrink-0">
+				<DialogHeader className="shrink-0">
 					<DialogTitle>Manage Access for "{project.name}"</DialogTitle>
 					<DialogDescription>
 						Control who can see and manage this project. Changes are not saved until you
@@ -281,18 +317,18 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 
 				<div className="flex-1 overflow-y-auto space-y-4 py-4">
 					{renderAccessList('Project Owners', 'owners')}
-					{renderAccessList('General Access', 'allow')}
+					{renderAccessList('General Access', 'viewers')}
 
 					<Card>
 						<CardHeader className="flex flex-row items-center justify-between pb-2">
 							<CardTitle className="text-base font-medium">Denied Users</CardTitle>
 							<Selector
 								items={allUsers.map((u) => ({ id: u.id, name: u.username }))}
-								onSelect={(id) => handleModify('add', 'deny', 'users', id)}
+								onSelect={(id) => handleModify('add', 'deniedUsers', 'users', id)}
 								disabledIds={[
 									...access.owners.users,
-									...access.allow.users,
-									...access.deny.users,
+									...access.viewers.users,
+									...access.deniedUsers,
 								]}
 								triggerText="Add User"
 							/>
@@ -300,17 +336,22 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 
 						<CardContent className="p-0">
 							<div className="max-h-32 overflow-y-auto border-t">
-								{access.deny.users.length > 0 ? (
+								{access.deniedUsers.length > 0 ? (
 									<Table>
 										<TableBody>
-											{access.deny.users.map((userId) => {
+											{access.deniedUsers.map((userId) => {
 												const user = getUserById(userId);
 												return (
 													<TableRow key={`deny-${userId}`}>
 														<TableCell className="flex items-center gap-2 py-2">
 															<Avatar className="h-6 w-6">
 																<AvatarImage
-																	src={user?.profileImage}
+																	src={
+																		typeof user?.profileImage ===
+																		'string'
+																			? user.profileImage
+																			: undefined
+																	}
 																/>
 																<AvatarFallback className="text-xs">
 																	{user?.username
@@ -330,7 +371,7 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 																onClick={() =>
 																	handleModify(
 																		'remove',
-																		'deny',
+																		'deniedUsers',
 																		'users',
 																		userId,
 																	)
@@ -354,12 +395,12 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 					</Card>
 				</div>
 
-				<DialogFooter className="flex-shrink-0">
+				<DialogFooter className="shrink-0">
 					<Button variant="outline" onClick={onClose}>
 						Cancel
 					</Button>
-					<Button onClick={handleSubmit} disabled={updateProjectMutation.isPending}>
-						{updateProjectMutation.isPending ? 'Saving...' : 'Save Changes'}
+					<Button onClick={handleSubmit} disabled={updateAccessMutation.isPending}>
+						{updateAccessMutation.isPending ? 'Saving...' : 'Save Changes'}
 					</Button>
 				</DialogFooter>
 			</DialogContent>

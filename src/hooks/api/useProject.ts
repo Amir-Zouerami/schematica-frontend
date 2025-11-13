@@ -1,25 +1,23 @@
-import { api } from '@/utils/api';
-import { Project, OpenAPISpec } from '@/types/types';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { components } from '@/types/api-types';
+import { api, ApiError } from '@/utils/api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+type ProjectDetailDto = components['schemas']['ProjectDetailDto'];
+// Note: Using 'any' for OpenAPISpec temporarily because the generated type is an empty object.
+// This will be replaced once we have a more complete OpenAPI type definition locally.
+type OpenAPISpec = any;
+type UpdateOpenApiSpecDto = components['schemas']['UpdateOpenApiSpecDto'];
 
 export const useProject = (projectId: string | undefined) => {
 	return useQuery({
 		queryKey: ['project', projectId],
 		queryFn: async () => {
 			if (!projectId) throw new Error('Project ID is required');
-
-			const response = await api.get<Project>(`/projects/${projectId}`);
-			if (response.error && (response as any).status === 404) {
-				throw new Error(`Project with ID ${projectId} not found.`);
-			}
-
-			if (response.error) {
-				throw new Error(`Project fetch error: ${response.error}`);
-			}
-
+			const response = await api.get<ProjectDetailDto>(`/projects/${projectId}`);
 			return response.data;
 		},
 		enabled: !!projectId,
+		retry: 1,
 	});
 };
 
@@ -27,19 +25,16 @@ export const useOpenApiSpec = (projectId: string | undefined) => {
 	return useQuery({
 		queryKey: ['openapi', projectId],
 		queryFn: async () => {
-			if (!projectId) throw new Error('Project ID is required');
-
-			const response = await api.get<OpenAPISpec>(`/projects/${projectId}/openapi`);
-
-			if (response.error && (response as any).status === 404) {
-				return null;
+			if (!projectId) return null;
+			try {
+				const response = await api.get<OpenAPISpec>(`/projects/${projectId}/openapi`);
+				return response.data;
+			} catch (error) {
+				if (error instanceof ApiError && error.status === 404) {
+					return null;
+				}
+				throw error;
 			}
-
-			if (response.error) {
-				return null;
-			}
-
-			return response.data || null;
 		},
 		enabled: !!projectId,
 	});
@@ -51,25 +46,15 @@ export const useUpdateOpenApi = () => {
 	return useMutation({
 		mutationFn: async ({
 			projectId,
-			specData,
-			lastKnownProjectUpdatedAt,
+			spec,
+			lastKnownUpdatedAt,
 		}: {
 			projectId: string;
-			specData: OpenAPISpec;
-			lastKnownProjectUpdatedAt?: string;
+			spec: UpdateOpenApiSpecDto['spec'];
+			lastKnownUpdatedAt: UpdateOpenApiSpecDto['lastKnownUpdatedAt'];
 		}) => {
-			const payload: any = { specData };
-
-			if (lastKnownProjectUpdatedAt) {
-				payload.lastKnownProjectUpdatedAt = lastKnownProjectUpdatedAt;
-			}
-
+			const payload: UpdateOpenApiSpecDto = { spec, lastKnownUpdatedAt };
 			const response = await api.put(`/projects/${projectId}/openapi`, payload);
-
-			if (response.error) {
-				throw response;
-			}
-
 			return response.data;
 		},
 		onSuccess: (data, variables) => {

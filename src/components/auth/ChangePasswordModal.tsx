@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { ApiError } from '@/utils/api';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+import { Button } from '@/components/ui/button';
 import {
 	Dialog,
 	DialogContent,
@@ -13,6 +13,8 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface ChangePasswordModalProps {
 	isOpen: boolean;
@@ -94,10 +96,16 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 			navigate(redirectTo, { replace: true });
 
 			resetForm();
-		} catch (error: any) {
+		} catch (err) {
+			let errorMessage = 'An unexpected error occurred. Please try again.';
+			if (err instanceof ApiError) {
+				errorMessage = err.message;
+			} else if (err instanceof Error) {
+				errorMessage = err.message;
+			}
 			toast({
 				title: 'Change Password Failed',
-				description: error?.message || 'An unexpected error occurred. Please try again.',
+				description: errorMessage,
 				variant: 'destructive',
 			});
 		} finally {

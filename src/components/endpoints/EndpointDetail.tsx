@@ -1,173 +1,163 @@
-import { useToast } from '@/hooks/use-toast';
-import React, { useState, useMemo } from 'react';
+import { useDeleteEndpoint, useUpdateEndpoint } from '@/hooks/api/useEndpoints';
 import { useProject } from '@/hooks/api/useProject';
+import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
-import { useUpdateEndpoint } from '@/hooks/api/useEndpoints';
-import { isRefObject, resolveRef, deeplyResolveReferences, formatDate } from '@/utils/schemaUtils';
-import {
-	OperationObject,
-	OpenAPISpec,
-	ParameterObject,
-	ReferenceObject,
-	RequestBodyObject,
-} from '@/types/types';
+import type { components } from '@/types/api-types';
+import { OpenAPISpec, OperationObject, ParameterObject, RequestBodyObject } from '@/types/types';
+import { deeplyResolveReferences, formatDate } from '@/utils/schemaUtils';
+import React, { useMemo, useState } from 'react';
 
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Copy, Link as LinkIcon, Trash2 } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 
-import EndpointForm from './EndpointForm';
+import { ApiError } from '@/utils/api';
+import { convertOpenApiToCurl } from '@/utils/openApiUtils';
 import NotesSection from './DetailTabs/NotesSection';
-import ResponsesTabContent from './DetailTabs/ResponsesTabContent';
 import ParametersTabContent from './DetailTabs/ParametersTabContent';
 import RequestBodyTabContent from './DetailTabs/RequestBodyTabContent';
+import ResponsesTabContent from './DetailTabs/ResponsesTabContent';
+import EndpointForm from './EndpointForm';
+
+type EndpointDto = components['schemas']['EndpointDto'];
 
 interface EndpointDetailProps {
-	path: string;
-	method: string;
-	operation: OperationObject | ReferenceObject;
+	endpoint: EndpointDto;
 	openApiSpec: OpenAPISpec;
 	projectId: string;
-	endpointId: string;
 }
 
-const EndpointDetail: React.FC<EndpointDetailProps> = ({
-	path: initialPath,
-	method: initialMethod,
-	operation: initialOperationOrRef,
-	openApiSpec,
-	projectId,
-	endpointId,
-}) => {
+const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, projectId }) => {
 	const { isProjectOwner } = usePermissions();
 	const { toast } = useToast();
+	const location = useLocation();
 	const { data: project } = useProject(projectId);
 	const [isEditMode, setIsEditMode] = useState(false);
+	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
 	const updateEndpointMutation = useUpdateEndpoint();
+	const deleteEndpointMutation = useDeleteEndpoint();
 
 	const operation = useMemo(() => {
-		if (!initialOperationOrRef) {
-			return { summary: 'Error: Operation data unavailable' } as OperationObject;
-		}
-
-		const op = isRefObject(initialOperationOrRef)
-			? resolveRef(initialOperationOrRef.$ref, openApiSpec)
-			: initialOperationOrRef;
-
-		if (!op || isRefObject(op)) {
-			return {
-				summary: `Error: Unresolved op ${isRefObject(initialOperationOrRef) ? initialOperationOrRef.$ref : ''}`,
-			} as OperationObject;
-		}
-
-		return deeplyResolveReferences<OperationObject>(op as OperationObject, openApiSpec);
-	}, [initialOperationOrRef, openApiSpec]);
+		return deeplyResolveReferences<OperationObject>(
+			endpoint.operation as OperationObject,
+			openApiSpec,
+		);
+	}, [endpoint.operation, openApiSpec]);
 
 	const pathParams = useMemo(
 		() =>
 			(operation.parameters?.filter(
-				(p) => !isRefObject(p) && p.in === 'path',
+				(p) => (p as ParameterObject).in === 'path',
 			) as ParameterObject[]) || [],
 		[operation.parameters],
 	);
-
 	const queryParams = useMemo(
 		() =>
 			(operation.parameters?.filter(
-				(p) => !isRefObject(p) && p.in === 'query',
+				(p) => (p as ParameterObject).in === 'query',
 			) as ParameterObject[]) || [],
 		[operation.parameters],
 	);
-
 	const headerParams = useMemo(
 		() =>
 			(operation.parameters?.filter(
-				(p) => !isRefObject(p) && p.in === 'header',
+				(p) => (p as ParameterObject).in === 'header',
 			) as ParameterObject[]) || [],
 		[operation.parameters],
 	);
 
 	const [activeTab, setActiveTab] = useState<string>('headerParams');
-
 	const resolvedRequestBody = useMemo(
 		() => operation.requestBody as RequestBodyObject | null,
 		[operation.requestBody],
 	);
 	const responseObjects = useMemo(() => operation.responses, [operation.responses]);
 
-	const appMetadata = operation['x-app-metadata'];
-	const createdBy = appMetadata?.createdBy || 'Unknown';
-	const createdAt = formatDate(appMetadata?.createdAt);
-	const lastEditedBy = appMetadata?.lastEditedBy;
-	const lastEditedAt = appMetadata?.lastEditedAt ? formatDate(appMetadata.lastEditedAt) : null;
+	const createdBy = endpoint.creator.username || 'Unknown';
+	const createdAt = formatDate(endpoint.createdAt);
+	const lastEditedBy = endpoint.updatedBy.username;
+	const lastEditedAt = formatDate(endpoint.updatedAt);
 
-	const handleFormSubmit = async (formDataFromForm: {
-		path: string;
-		method: string;
-		operation: OperationObject;
-		_lastKnownOperationUpdatedAt?: string;
-	}) => {
-		const {
-			path: newFormPath,
-			method: newFormMethod,
-			operation: operationFromForm,
-			_lastKnownOperationUpdatedAt,
-		} = formDataFromForm;
+	const handleFormSubmit = async (formDataFromForm: any) => {
+		// This will be implemented in the next step
+		console.log('Form data to submit:', formDataFromForm);
+		setIsEditMode(false);
+	};
 
+	const generateClientSideId = (method: string, path: string): string => {
+		return `${method.toLowerCase()}-${path.replace(/^\//, '').replace(/[\/{}]/g, '-')}`;
+	};
+
+	const handleShareEndpoint = () => {
+		const clientSideId = generateClientSideId(endpoint.method, endpoint.path);
+		const url = `${window.location.origin}${location.pathname}#${clientSideId}`;
+		navigator.clipboard.writeText(url);
+		toast({ title: 'URL Copied', description: 'Link to this endpoint copied.' });
+	};
+
+	const handleCopyCurl = () => {
+		if (!openApiSpec) return;
 		try {
-			await updateEndpointMutation.mutateAsync({
-				projectId,
-				originalPath: initialPath,
-				originalMethod: initialMethod,
-				newPath: newFormPath,
-				newMethod: newFormMethod,
-				operation: operationFromForm,
-				lastKnownOperationUpdatedAt: _lastKnownOperationUpdatedAt,
-			});
-
+			// **FIX: Correctly check typeof serverUrl**
+			const baseUrl =
+				typeof project?.serverUrl === 'string'
+					? project.serverUrl
+					: 'https://api.example.com';
+			const curl = convertOpenApiToCurl(
+				baseUrl,
+				endpoint.path,
+				endpoint.method,
+				operation,
+				openApiSpec,
+			);
+			navigator.clipboard.writeText(curl);
+			toast({ title: 'cURL Copied', description: 'cURL command copied to clipboard.' });
+		} catch (error) {
 			toast({
-				title: 'Endpoint updated',
-				description: 'The endpoint has been updated successfully',
+				title: 'Error',
+				description: 'Could not generate cURL command.',
+				variant: 'destructive',
 			});
-			setIsEditMode(false);
-		} catch (error: any) {
-			if (error && typeof error.error === 'string' && error.status !== undefined) {
-				if (error.status !== 409) {
-					toast({
-						title: 'Update Failed',
-						description: error.error || 'Failed to update endpoint',
-						variant: 'destructive',
-					});
-				}
-			} else {
-				toast({
-					title: 'Client Error',
-					description:
-						(error as Error).message || 'An unexpected client-side error occurred.',
-					variant: 'destructive',
-				});
-			}
-			throw error;
+		}
+	};
+
+	const handleDeleteEndpoint = async () => {
+		try {
+			await deleteEndpointMutation.mutateAsync({ projectId, endpointId: endpoint.id });
+			toast({
+				title: 'Endpoint Deleted',
+				description: 'The endpoint has been successfully removed.',
+			});
+			setIsDeleteDialogOpen(false);
+		} catch (err) {
+			const errorMessage =
+				err instanceof ApiError ? err.message : 'Failed to delete endpoint.';
+			toast({ title: 'Delete Failed', description: errorMessage, variant: 'destructive' });
 		}
 	};
 
 	if (isEditMode && isProjectOwner(project)) {
 		return (
-			<Dialog
-				open={isEditMode}
-				onOpenChange={(openState) => {
-					if (!openState && !updateEndpointMutation.isPending) setIsEditMode(false);
-				}}
-			>
+			<Dialog open={isEditMode} onOpenChange={setIsEditMode}>
 				<DialogContent className="max-w-4xl w-[95vw] md:w-[90vw] lg:w-[80vw] xl:w-[70vw] p-0 max-h-[95vh] flex flex-col">
 					<EndpointForm
 						projectId={projectId}
-						initialEndpoint={{
-							path: initialPath,
-							method: initialMethod,
-							operation: operation,
-						}}
+						endpoint={endpoint}
 						onClose={() => setIsEditMode(false)}
 						onSubmit={handleFormSubmit}
 						openApiSpec={openApiSpec}
@@ -178,11 +168,11 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({
 	}
 
 	return (
-		<div className="px-4 py-2" id={endpointId}>
+		<div className="px-4 py-2" id={endpoint.id}>
 			<div className="flex justify-between items-center gap-4 mb-4 mt-3">
 				<div>
 					<h3 className="text-lg font-semibold">
-						{operation.summary || `${initialMethod.toUpperCase()} ${initialPath}`}
+						{operation.summary || `${endpoint.method.toUpperCase()} ${endpoint.path}`}
 					</h3>
 					{operation.description && (
 						<p
@@ -193,14 +183,13 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({
 						</p>
 					)}
 				</div>
-
 				<div className="flex flex-col justify-center items-start space-y-2 sm:space-y-3 flex-shrink-0">
 					<div className="flex items-center space-x-2 text-sm text-muted-foreground">
 						<Avatar className="h-6 w-6">
 							<AvatarImage
 								src={
-									createdBy !== 'Unknown'
-										? `/profile-pictures/${createdBy}.png`
+									typeof endpoint.creator.profileImage === 'string'
+										? endpoint.creator.profileImage
 										: undefined
 								}
 								alt={createdBy}
@@ -209,19 +198,17 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({
 								{createdBy.substring(0, 2).toUpperCase()}
 							</AvatarFallback>
 						</Avatar>
-
 						<span className="text-xs">
 							Added by {createdBy} on {createdAt}
 						</span>
 					</div>
-
 					{lastEditedBy && lastEditedAt && (
 						<div className="flex items-center space-x-2 text-sm text-muted-foreground">
 							<Avatar className="h-6 w-6">
 								<AvatarImage
 									src={
-										lastEditedBy
-											? `/profile-pictures/${lastEditedBy}.png`
+										typeof endpoint.updatedBy.profileImage === 'string'
+											? endpoint.updatedBy.profileImage
 											: undefined
 									}
 									alt={lastEditedBy}
@@ -230,13 +217,11 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({
 									{lastEditedBy.substring(0, 2).toUpperCase()}
 								</AvatarFallback>
 							</Avatar>
-
 							<span className="text-xs">
 								Last edited by {lastEditedBy} on {lastEditedAt}
 							</span>
 						</div>
 					)}
-
 					{isProjectOwner(project) && (
 						<Button
 							variant="outline"
@@ -250,7 +235,6 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({
 					)}
 				</div>
 			</div>
-
 			<div>
 				<Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
 					<TabsList>
@@ -263,54 +247,85 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({
 							Notes ({operation['x-app-metadata']?.notes?.length || 0})
 						</TabsTrigger>
 					</TabsList>
-
-					<TabsContent value="headerParams" className="space-y-6">
+					<TabsContent value="headerParams">
 						<ParametersTabContent
 							parameters={headerParams}
 							openApiSpec={openApiSpec}
 							paramTypeLabel="Headers"
 						/>
 					</TabsContent>
-
-					<TabsContent value="queryParams" className="space-y-6">
+					<TabsContent value="queryParams">
 						<ParametersTabContent
 							parameters={queryParams}
 							openApiSpec={openApiSpec}
 							paramTypeLabel="Query Params"
 						/>
 					</TabsContent>
-
-					<TabsContent value="pathParams" className="space-y-6">
+					<TabsContent value="pathParams">
 						<ParametersTabContent
 							parameters={pathParams}
 							openApiSpec={openApiSpec}
 							paramTypeLabel="Path Params"
 						/>
 					</TabsContent>
-
-					<TabsContent value="requestBody" className="space-y-4">
+					<TabsContent value="requestBody">
 						<RequestBodyTabContent
 							requestBody={resolvedRequestBody}
 							openApiSpec={openApiSpec}
 						/>
 					</TabsContent>
-
-					<TabsContent value="responses" className="space-y-6">
+					<TabsContent value="responses">
 						<ResponsesTabContent
 							responses={responseObjects}
 							openApiSpec={openApiSpec}
 						/>
 					</TabsContent>
-
 					<TabsContent value="notes">
 						<NotesSection
 							projectId={projectId}
-							path={initialPath}
-							method={initialMethod}
+							path={endpoint.path}
+							method={endpoint.method}
 							operation={operation}
 						/>
 					</TabsContent>
 				</Tabs>
+			</div>
+			<div className="flex justify-end space-x-2 p-4 bg-secondary/20 border-t border-border -mx-4 -mb-2 mt-4">
+				<Button variant="outline" size="sm" onClick={handleShareEndpoint}>
+					<LinkIcon className="h-4 w-4 mr-1" /> Share Link
+				</Button>
+				<Button variant="outline" size="sm" onClick={handleCopyCurl}>
+					<Copy className="h-4 w-4 mr-1" /> Copy CURL
+				</Button>
+				{isProjectOwner(project) && (
+					<AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+						<AlertDialogTrigger asChild>
+							<Button variant="destructive" size="sm">
+								<Trash2 className="h-4 w-4 mr-1" /> Delete Endpoint
+							</Button>
+						</AlertDialogTrigger>
+						<AlertDialogContent>
+							<AlertDialogHeader>
+								<AlertDialogTitle>Are you sure?</AlertDialogTitle>
+								<AlertDialogDescription>
+									This will permanently delete the endpoint "
+									{operation.summary ||
+										`${endpoint.method.toUpperCase()} ${endpoint.path}`}
+									". This action cannot be undone.
+								</AlertDialogDescription>
+							</AlertDialogHeader>
+							<AlertDialogFooter>
+								<AlertDialogCancel>Cancel</AlertDialogCancel>
+								<AlertDialogAction
+									onClick={handleDeleteEndpoint}
+									disabled={deleteEndpointMutation.isPending}
+								>
+									{deleteEndpointMutation.isPending ? 'Deleting...' : 'Delete'}
+								</AlertDialogAction>
+							</AlertDialogFooter>
+						</AlertDialogContent>
+					</AlertDialog>
+				)}
 			</div>
 		</div>
 	);
