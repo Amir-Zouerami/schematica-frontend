@@ -1,3 +1,4 @@
+import { useAuth } from '@/contexts/AuthContext';
 import {
 	useDeleteEndpoint,
 	useUpdateEndpoint,
@@ -6,6 +7,7 @@ import {
 import { useAcquireLock, useReleaseLock } from '@/hooks/api/useLocking';
 import { useProject } from '@/hooks/api/useProject';
 import { useToast } from '@/hooks/use-toast';
+import { useEndpointLockSocket } from '@/hooks/useEndpointLockSocket';
 import { usePermissions } from '@/hooks/usePermissions';
 import type { components } from '@/types/api-types';
 import { OpenAPISpec, OperationObject, ParameterObject, RequestBodyObject } from '@/types/types';
@@ -26,7 +28,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
 	Select,
 	SelectContent,
@@ -35,11 +37,12 @@ import {
 	SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Copy, Edit3, Link as LinkIcon, Trash2 } from 'lucide-react';
+import { Copy, Edit3, Link as LinkIcon, Lock, Trash2 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 
 import { ApiError } from '@/utils/api';
 import { convertOpenApiToCurl } from '@/utils/openApiUtils';
+import LockConflictModal from '../general/LockConflictModal';
 import NotesSection from './DetailTabs/NotesSection';
 import ParametersTabContent from './DetailTabs/ParametersTabContent';
 import RequestBodyTabContent from './DetailTabs/RequestBodyTabContent';
@@ -55,6 +58,7 @@ interface EndpointDetailProps {
 }
 
 const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, projectId }) => {
+	const { user } = useAuth();
 	const { isProjectOwner } = usePermissions();
 	const { toast } = useToast();
 	const location = useLocation();
@@ -62,6 +66,8 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 
 	const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+	const [lockConflictDetails, setLockConflictDetails] = useState(null);
+	const { activeLock, isLoading: isLockLoading } = useEndpointLockSocket(endpoint.id);
 
 	const updateEndpointMutation = useUpdateEndpoint();
 	const deleteEndpointMutation = useDeleteEndpoint();
@@ -184,21 +190,27 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 	};
 
 	const handleEnterEditMode = async () => {
+		if (activeLock && activeLock.username !== user?.username) {
+			setLockConflictDetails(activeLock);
+			return;
+		}
+
 		try {
 			await acquireLockMutation.mutateAsync({ projectId, endpointId: endpoint.id });
 			setIsEditDialogOpen(true);
 		} catch (err) {
-			let description = 'Could not acquire lock for editing. Please try again.';
-			if (err instanceof ApiError && err.status === 409) {
-				description = err.message;
-			} else if (err instanceof ApiError) {
-				description = err.message;
+			if (err instanceof ApiError && err.status === 409 && err.errorResponse?.message) {
+				const lockInfo = (err.errorResponse.message as any)?.lock;
+				setLockConflictDetails(lockInfo);
+			} else {
+				const description =
+					err instanceof ApiError ? err.message : 'Could not acquire lock for editing.';
+				toast({
+					title: 'Cannot Edit Endpoint',
+					description,
+					variant: 'destructive',
+				});
 			}
-			toast({
-				title: 'Cannot Edit Endpoint',
-				description,
-				variant: 'destructive',
-			});
 		}
 	};
 
@@ -218,6 +230,9 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 		}
 		setIsEditDialogOpen(false);
 	};
+
+	// --- LOGIC FOR DISABLING BUTTON ---
+	const isLockedByOtherUser = activeLock && activeLock.username !== user?.username;
 
 	return (
 		<div className="px-4 py-2" id={endpoint.id}>
@@ -298,24 +313,38 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 						</div>
 					)}
 					{isProjectOwner(project) && (
-						<Button
-							variant="outline"
-							size="sm"
-							onClick={handleEnterEditMode}
-							className="mt-2 w-full"
-							disabled={
-								updateEndpointMutation.isPending || acquireLockMutation.isPending
-							}
-						>
-							{acquireLockMutation.isPending ? (
-								'Locking...'
-							) : (
-								<>
-									<Edit3 className="h-4 w-4 mr-2" />
-									Edit Endpoint
-								</>
+						<div className="w-full">
+							{isLockedByOtherUser && (
+								<Badge
+									variant="secondary"
+									className="mb-2 w-full justify-center text-xs py-1"
+								>
+									<Lock className="h-3 w-3 mr-1.5" />
+									Locked by {activeLock.username}
+								</Badge>
 							)}
-						</Button>
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={handleEnterEditMode}
+								className="mt-2 w-full"
+								disabled={
+									isLockLoading ||
+									isLockedByOtherUser ||
+									updateEndpointMutation.isPending ||
+									acquireLockMutation.isPending
+								}
+							>
+								{acquireLockMutation.isPending ? (
+									'Locking...'
+								) : (
+									<>
+										<Edit3 className="h-4 w-4 mr-2" />
+										Edit Endpoint
+									</>
+								)}
+							</Button>
+						</div>
 					)}
 				</div>
 			</div>
@@ -419,6 +448,11 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 					}}
 				>
 					<DialogContent className="max-w-4xl w-[95vw] md:w-[90vw] lg:w-[80vw] xl:w-[70vw] p-0 max-h-[95vh] flex flex-col">
+						<DialogHeader className="p-6 pb-2">
+							<DialogTitle className="text-gradient-green text-xl">
+								{endpoint ? 'Edit Endpoint' : 'Create New Endpoint'}
+							</DialogTitle>
+						</DialogHeader>
 						<EndpointForm
 							projectId={projectId}
 							endpoint={endpoint}
@@ -429,6 +463,12 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 					</DialogContent>
 				</Dialog>
 			)}
+
+			<LockConflictModal
+				isOpen={!!lockConflictDetails}
+				onClose={() => setLockConflictDetails(null)}
+				lockDetails={lockConflictDetails}
+			/>
 		</div>
 	);
 };

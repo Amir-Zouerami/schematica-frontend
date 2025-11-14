@@ -518,11 +518,6 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 	return (
 		<>
 			<Card className="p-4 max-h-[90vh] overflow-y-auto">
-				<CardHeader>
-					<CardTitle className="text-gradient-green">
-						{endpoint ? 'Edit Endpoint' : 'Create New Endpoint'}
-					</CardTitle>
-				</CardHeader>
 				<CardContent>
 					<form onSubmit={handleSubmit} id={`${formId}-mainForm`} className="space-y-6">
 						<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
