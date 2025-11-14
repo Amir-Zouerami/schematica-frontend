@@ -10,8 +10,8 @@ import { useToast } from '@/hooks/use-toast';
 import type { components } from '@/types/api-types';
 import { ApiError } from '@/utils/api';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Edit, PlusCircle, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Edit, PlusCircle, Search, Trash2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -37,6 +37,13 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
+	Pagination,
+	PaginationContent,
+	PaginationItem,
+	PaginationNext,
+	PaginationPrevious,
+} from '@/components/ui/pagination';
+import {
 	Select,
 	SelectContent,
 	SelectItem,
@@ -51,11 +58,13 @@ import {
 	TableHeader,
 	TableRow,
 } from '@/components/ui/table';
+import { Skeleton } from '../ui/skeleton';
 
 // --- Type Definitions ---
 type UserDto = components['schemas']['UserDto'];
 type TeamDto = components['schemas']['TeamDto'];
 type Role = components['schemas']['Role'];
+type UpdateUserDto = components['schemas']['UpdateUserDto'];
 
 // --- Zod Schema for Validation ---
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -81,16 +90,47 @@ const createUserSchema = baseUserSchema.extend({
 	password: z.string().min(8, 'Password must be at least 8 characters long.'),
 });
 
-// Schema for editing an existing user (password is not part of this form)
-const editUserSchema = baseUserSchema;
+// Schema for editing an existing user (password is optional)
+const editUserSchema = baseUserSchema
+	.extend({
+		password: z
+			.string()
+			.min(8, 'New password must be at least 8 characters long.')
+			.optional()
+			.or(z.literal('')),
+		confirmPassword: z.string().optional(),
+	})
+	.refine((data) => data.password === data.confirmPassword, {
+		message: "Passwords don't match.",
+		path: ['confirmPassword'],
+	});
 
 type CreateUserFormValues = z.infer<typeof createUserSchema>;
 type EditUserFormValues = z.infer<typeof editUserSchema>;
 
 const UserManagement = () => {
-	const { data: usersResponse, isLoading: isLoadingUsers, error: usersError } = useAdminUsers();
+	const [page, setPage] = useState(1);
+	const [searchTerm, setSearchTerm] = useState('');
+	const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+
+	useEffect(() => {
+		const handler = setTimeout(() => {
+			setDebouncedSearchTerm(searchTerm);
+			setPage(1);
+		}, 500);
+		return () => clearTimeout(handler);
+	}, [searchTerm]);
+
+	const {
+		data: usersResponse,
+		isLoading: isLoadingUsers,
+		error: usersError,
+	} = useAdminUsers(page, 10, debouncedSearchTerm);
+
 	const { data: teamsResponse, isLoading: isLoadingTeams } = useTeams();
+
 	const users = usersResponse?.data || [];
+	const meta = usersResponse?.meta;
 	const teams = teamsResponse?.data || [];
 	const { toast } = useToast();
 
@@ -120,6 +160,8 @@ const UserManagement = () => {
 					role: editingUser.role,
 					teams: editingUser.teams?.map((t: TeamDto) => t.id) || [],
 					profileImage: null,
+					password: '',
+					confirmPassword: '',
 				});
 			} else {
 				form.reset({
@@ -149,10 +191,16 @@ const UserManagement = () => {
 				const editValues = values as EditUserFormValues;
 				const updatePromises: Promise<any>[] = [];
 
-				const userDetailsPayload = {
+				const userDetailsPayload: UpdateUserDto = {
 					role: editValues.role,
 					teams: editValues.teams || [],
 				};
+
+				// Conditionally add password to payload if provided
+				if (editValues.password) {
+					userDetailsPayload.password = editValues.password;
+				}
+
 				updatePromises.push(
 					updateUserMutation.mutateAsync({
 						userId: editingUser.id,
@@ -174,7 +222,6 @@ const UserManagement = () => {
 				await Promise.all(updatePromises);
 				toast({ title: 'Success', description: 'User updated successfully.' });
 			} else {
-				// Create new user
 				const createValues = values as CreateUserFormValues;
 				const createPayload = new FormData();
 				createPayload.append('username', createValues.username);
@@ -194,7 +241,16 @@ const UserManagement = () => {
 		} catch (err) {
 			const apiError = err as ApiError;
 			if (apiError.status === 409) {
-				form.setError('username', { type: 'server', message: apiError.message });
+				let errorMessage = apiError.message;
+				try {
+					const parsedError = JSON.parse(errorMessage);
+					if (parsedError && typeof parsedError.message === 'string') {
+						errorMessage = parsedError.message;
+					}
+				} catch (e) {
+					// Not a JSON string, use as is.
+				}
+				form.setError('username', { type: 'server', message: errorMessage });
 			} else {
 				toast({
 					title: 'Error',
@@ -245,6 +301,17 @@ const UserManagement = () => {
 						<PlusCircle className="mr-2 h-4 w-4" /> Create User
 					</Button>
 				</CardTitle>
+				<div className="relative mt-4">
+					<Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+					<Input
+						placeholder="Search by username..."
+						value={searchTerm}
+						onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+							setSearchTerm(e.target.value)
+						}
+						className="w-full rounded-lg bg-background pl-8"
+					/>
+				</div>
 			</CardHeader>
 			<CardContent>
 				<Table>
@@ -258,8 +325,18 @@ const UserManagement = () => {
 					</TableHeader>
 					<TableBody>
 						{isLoadingUsers ? (
+							Array.from({ length: 5 }).map((_, i) => (
+								<TableRow key={i}>
+									<TableCell colSpan={4}>
+										<Skeleton className="h-10 w-full" />
+									</TableCell>
+								</TableRow>
+							))
+						) : users.length === 0 ? (
 							<TableRow>
-								<TableCell colSpan={4}>Loading users...</TableCell>
+								<TableCell colSpan={4} className="h-24 text-center">
+									No users found.
+								</TableCell>
 							</TableRow>
 						) : (
 							users.map((user) => (
@@ -310,9 +387,49 @@ const UserManagement = () => {
 						)}
 					</TableBody>
 				</Table>
+				{meta && meta.total > meta.limit && (
+					<div className="mt-4 flex items-center justify-end">
+						<Pagination>
+							<PaginationContent>
+								<PaginationItem>
+									<PaginationPrevious
+										href="#"
+										size="default"
+										onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+											e.preventDefault();
+											setPage((old) => Math.max(old - 1, 1));
+										}}
+										className={
+											page === 1 ? 'pointer-events-none opacity-50' : ''
+										}
+									/>
+								</PaginationItem>
+								<span className="text-sm text-muted-foreground mx-2">
+									Page {meta.page} of {meta.lastPage}
+								</span>
+								<PaginationItem>
+									<PaginationNext
+										href="#"
+										size="default"
+										onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+											e.preventDefault();
+											if (page < meta.lastPage) {
+												setPage((old) => old + 1);
+											}
+										}}
+										className={
+											page === meta.lastPage
+												? 'pointer-events-none opacity-50'
+												: ''
+										}
+									/>
+								</PaginationItem>
+							</PaginationContent>
+						</Pagination>
+					</div>
+				)}
 			</CardContent>
 
-			{/* Form Dialog for Create/Edit */}
 			<Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
 				<DialogContent className="max-w-4xl">
 					<DialogHeader>
@@ -333,7 +450,40 @@ const UserManagement = () => {
 									</FormItem>
 								)}
 							/>
-							{!editingUser && (
+							{editingUser ? (
+								<>
+									<FormField
+										control={form.control}
+										name="password"
+										render={({ field }) => (
+											<FormItem>
+												<FormLabel>New Password (Optional)</FormLabel>
+												<FormControl>
+													<Input
+														type="password"
+														placeholder="Leave blank to keep current password"
+														{...field}
+													/>
+												</FormControl>
+												<FormMessage />
+											</FormItem>
+										)}
+									/>
+									<FormField
+										control={form.control}
+										name="confirmPassword"
+										render={({ field }) => (
+											<FormItem>
+												<FormLabel>Confirm New Password</FormLabel>
+												<FormControl>
+													<Input type="password" {...field} />
+												</FormControl>
+												<FormMessage />
+											</FormItem>
+										)}
+									/>
+								</>
+							) : (
 								<FormField
 									control={form.control}
 									name="password"
@@ -453,7 +603,6 @@ const UserManagement = () => {
 				</DialogContent>
 			</Dialog>
 
-			{/* Delete Confirmation Dialog */}
 			<Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
 				<DialogContent className="max-w-3xl">
 					<DialogHeader>

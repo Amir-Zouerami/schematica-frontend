@@ -3,8 +3,8 @@ import { useToast } from '@/hooks/use-toast';
 import type { components } from '@/types/api-types';
 import { ApiError } from '@/utils/api';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Edit, PlusCircle, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Edit, PlusCircle, Search, Trash2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
@@ -28,6 +28,14 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
+	Pagination,
+	PaginationContent,
+	PaginationItem,
+	PaginationNext,
+	PaginationPrevious,
+} from '@/components/ui/pagination';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
 	Table,
 	TableBody,
 	TableCell,
@@ -38,15 +46,27 @@ import {
 
 type TeamDto = components['schemas']['TeamDto'];
 
-// 1. Define the Zod schema for the form
 const teamFormSchema = z.object({
 	name: z.string().min(1, { message: 'Team name cannot be empty.' }),
 });
 type TeamFormValues = z.infer<typeof teamFormSchema>;
 
 const TeamManagement = () => {
-	const { data: response, isLoading, error } = useTeams();
+	const [page, setPage] = useState(1);
+	const [searchTerm, setSearchTerm] = useState('');
+	const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+
+	useEffect(() => {
+		const handler = setTimeout(() => {
+			setDebouncedSearchTerm(searchTerm);
+			setPage(1);
+		}, 500);
+		return () => clearTimeout(handler);
+	}, [searchTerm]);
+
+	const { data: response, isLoading, error } = useTeams(page, 10, debouncedSearchTerm);
 	const teams = response?.data || [];
+	const meta = response?.meta;
 	const { toast } = useToast();
 
 	const createTeamMutation = useCreateTeam();
@@ -59,7 +79,6 @@ const TeamManagement = () => {
 	const [editingTeam, setEditingTeam] = useState<TeamDto | null>(null);
 	const [deletingTeam, setDeletingTeam] = useState<TeamDto | null>(null);
 
-	// 2. Initialize the form with react-hook-form
 	const form = useForm<TeamFormValues>({
 		resolver: zodResolver(teamFormSchema),
 		defaultValues: {
@@ -69,7 +88,6 @@ const TeamManagement = () => {
 
 	const { isSubmitting } = form.formState;
 
-	// Reset form state when the dialog opens or closes
 	useEffect(() => {
 		if (isFormDialogOpen) {
 			if (editingTeam) {
@@ -90,18 +108,15 @@ const TeamManagement = () => {
 		setIsFormDialogOpen(true);
 	};
 
-	// 3. Define the submit handler
 	const onSubmit = async (values: TeamFormValues) => {
 		try {
 			if (editingTeam) {
-				// Update existing team
 				await updateTeamMutation.mutateAsync({
 					teamId: editingTeam.id,
 					teamData: { name: values.name },
 				});
 				toast({ title: 'Success', description: 'Team updated successfully.' });
 			} else {
-				// Create new team
 				await createTeamMutation.mutateAsync({ name: values.name });
 				toast({ title: 'Success', description: 'Team created successfully.' });
 			}
@@ -109,7 +124,17 @@ const TeamManagement = () => {
 		} catch (err) {
 			const apiError = err as ApiError;
 			if (apiError.status === 409) {
-				form.setError('name', { type: 'server', message: apiError.message });
+				let errorMessage = apiError.message;
+				try {
+					// Attempt to parse the message in case it's a JSON string
+					const parsedError = JSON.parse(errorMessage);
+					if (parsedError && typeof parsedError.message === 'string') {
+						errorMessage = parsedError.message;
+					}
+				} catch (e) {
+					// It wasn't a JSON string, so we use the message as is.
+				}
+				form.setError('name', { type: 'server', message: errorMessage });
 			} else {
 				const errorMessage = apiError.message || 'An unexpected error occurred.';
 				toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
@@ -161,6 +186,15 @@ const TeamManagement = () => {
 						<PlusCircle className="mr-2 h-4 w-4" /> Create Team
 					</Button>
 				</CardTitle>
+				<div className="relative mt-4">
+					<Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+					<Input
+						placeholder="Search by team name..."
+						value={searchTerm}
+						onChange={(e) => setSearchTerm(e.target.value)}
+						className="w-full rounded-lg bg-background pl-8"
+					/>
+				</div>
 			</CardHeader>
 
 			<CardContent>
@@ -174,12 +208,18 @@ const TeamManagement = () => {
 
 					<TableBody>
 						{isLoading ? (
-							<TableRow>
-								<TableCell colSpan={2}>Loading teams...</TableCell>
-							</TableRow>
+							Array.from({ length: 5 }).map((_, i) => (
+								<TableRow key={i}>
+									<TableCell colSpan={2}>
+										<Skeleton className="h-10 w-full" />
+									</TableCell>
+								</TableRow>
+							))
 						) : teams.length === 0 ? (
 							<TableRow>
-								<TableCell colSpan={2}>No teams found.</TableCell>
+								<TableCell colSpan={2} className="h-24 text-center">
+									No teams found.
+								</TableCell>
 							</TableRow>
 						) : (
 							teams.map((team) => (
@@ -207,6 +247,47 @@ const TeamManagement = () => {
 						)}
 					</TableBody>
 				</Table>
+				{meta && meta.total > meta.limit && (
+					<div className="mt-4 flex items-center justify-end">
+						<Pagination>
+							<PaginationContent>
+								<PaginationItem>
+									<PaginationPrevious
+										href="#"
+										size="default"
+										onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+											e.preventDefault();
+											setPage((old) => Math.max(old - 1, 1));
+										}}
+										className={
+											page === 1 ? 'pointer-events-none opacity-50' : ''
+										}
+									/>
+								</PaginationItem>
+								<span className="text-sm text-muted-foreground mx-2">
+									Page {meta.page} of {meta.lastPage}
+								</span>
+								<PaginationItem>
+									<PaginationNext
+										href="#"
+										size="default"
+										onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+											e.preventDefault();
+											if (page < meta.lastPage) {
+												setPage((old) => old + 1);
+											}
+										}}
+										className={
+											page === meta.lastPage
+												? 'pointer-events-none opacity-50'
+												: ''
+										}
+									/>
+								</PaginationItem>
+							</PaginationContent>
+						</Pagination>
+					</div>
+				)}
 			</CardContent>
 
 			{/* Form Dialog for Create/Edit */}
