@@ -48,7 +48,8 @@ export const useEndpoint = (projectId: string | undefined, endpointId: string | 
 			return response.data;
 		},
 		enabled: !!projectId && !!endpointId,
-		staleTime: 1000 * 60 * 5,
+		staleTime: 2 * 60 * 1000,
+		gcTime: 5 * 60 * 1000,
 	});
 };
 

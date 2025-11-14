@@ -230,13 +230,13 @@
 /*        MISC ELEMENTS          */
 /* ----------------------------- */
 
-[data-state='open'] {
+/* [data-state='open'] {
 	animation: scrollIntoView 0.1s ease-out;
 }
 
 [data-state='active'] {
 	animation: scrollIntoView 0.1s ease-out;
-}
+} */
 
 @keyframes scrollIntoView {
 	to {

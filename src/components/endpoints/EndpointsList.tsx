@@ -191,12 +191,14 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 										</div>
 									</AccordionTrigger>
 									<AccordionContent className="p-0">
-										<div className="border-t border-border">
-											<EndpointDetailLoader
-												projectId={projectId}
-												endpointId={endpoint.id}
-												openApiSpec={openApiSpec}
-											/>
+										<div className="pt-4">
+											<div className="border-t border-border">
+												<EndpointDetailLoader
+													projectId={projectId}
+													endpointId={endpoint.id}
+													openApiSpec={openApiSpec}
+												/>
+											</div>
 										</div>
 									</AccordionContent>
 								</AccordionItem>

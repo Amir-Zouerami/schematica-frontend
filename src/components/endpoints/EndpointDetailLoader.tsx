@@ -2,6 +2,7 @@ import { useEndpoint } from '@/hooks/api/useEndpoints';
 import { Skeleton } from '@/components/ui/skeleton';
 import EndpointDetail from './EndpointDetail';
 import { OpenAPISpec } from '@/types/types';
+import { useEffect } from 'react';
 
 interface EndpointDetailLoaderProps {
 	projectId: string;
@@ -18,7 +19,7 @@ const EndpointDetailLoader: React.FC<EndpointDetailLoaderProps> = ({
 
 	if (isLoading) {
 		return (
-			<div className="p-4 space-y-4 min-h-[400px]">
+			<div className="p-4 space-y-4">
 				<div className="flex justify-between items-start">
 					<div className="space-y-2">
 						<Skeleton className="h-6 w-72" />
@@ -31,6 +32,11 @@ const EndpointDetailLoader: React.FC<EndpointDetailLoaderProps> = ({
 				</div>
 				<div className="pt-4">
 					<Skeleton className="h-10 w-full" />
+				</div>
+				<div className="space-y-2">
+					<Skeleton className="h-8 w-full" />
+					<Skeleton className="h-8 w-full" />
+					<Skeleton className="h-8 w-full" />
 				</div>
 			</div>
 		);
