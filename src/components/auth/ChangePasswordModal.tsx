@@ -39,7 +39,6 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 	const [confirmPassword, setConfirmPassword] = useState('');
 	const [isLoading, setIsLoading] = useState(false);
 
-	// Reset all state when the modal is closed or opened.
 	useEffect(() => {
 		if (isOpen) {
 			setFormMode('change');
@@ -100,12 +99,9 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 				onClose();
 				navigate(redirectTo, { replace: true });
 			} catch (err) {
-				// This is the key logic: check for the specific error to switch to "set" mode.
-				// We rely on the API's error message string for this detection.
 				if (
 					err instanceof ApiError &&
-					err.status === 400 &&
-					err.message.includes('OAuth')
+					err.errorResponse?.type === 'OAUTH_USER_NO_PASSWORD_SET'
 				) {
 					setFormMode('set');
 					toast({
@@ -126,7 +122,6 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 				setIsLoading(false);
 			}
 		} else {
-			// Handle "set" password mode
 			try {
 				await setPasswordMutation.mutateAsync({ newPassword });
 				toast({

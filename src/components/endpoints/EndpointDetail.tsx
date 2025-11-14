@@ -1,5 +1,9 @@
-import { useDeleteEndpoint, useUpdateEndpoint } from '@/hooks/api/useEndpoints';
-import { useAcquireLock } from '@/hooks/api/useLocking';
+import {
+	useDeleteEndpoint,
+	useUpdateEndpoint,
+	useUpdateEndpointStatus,
+} from '@/hooks/api/useEndpoints';
+import { useAcquireLock, useReleaseLock } from '@/hooks/api/useLocking';
 import { useProject } from '@/hooks/api/useProject';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -7,16 +11,7 @@ import type { components } from '@/types/api-types';
 import { OpenAPISpec, OperationObject, ParameterObject, RequestBodyObject } from '@/types/types';
 import { deeplyResolveReferences, formatDate } from '@/utils/schemaUtils';
 import React, { useMemo, useState } from 'react';
-import { useUpdateEndpointStatus } from '@/hooks/api/useEndpoints';
 
-import { Badge } from '@/components/ui/badge';
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from '@/components/ui/select';
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -29,10 +24,18 @@ import {
 	AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Copy, Edit3, Link as LinkIcon, Lock, Trash2 } from 'lucide-react';
+import { Copy, Edit3, Link as LinkIcon, Trash2 } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 
 import { ApiError } from '@/utils/api';
@@ -56,17 +59,19 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 	const { toast } = useToast();
 	const location = useLocation();
 	const { data: project } = useProject(projectId);
-	const [isEditMode, setIsEditMode] = useState(false);
+
+	const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
 	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
 	const updateEndpointMutation = useUpdateEndpoint();
 	const deleteEndpointMutation = useDeleteEndpoint();
 	const acquireLockMutation = useAcquireLock();
+	const releaseLockMutation = useReleaseLock();
 	const updateStatusMutation = useUpdateEndpointStatus();
 
 	const operation = useMemo(() => {
 		return deeplyResolveReferences<OperationObject>(
-			endpoint.operation as OperationObject,
+			endpoint.operation as unknown as OperationObject,
 			openApiSpec,
 		);
 	}, [endpoint.operation, openApiSpec]);
@@ -123,9 +128,8 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 	};
 
 	const handleFormSubmit = async (formDataFromForm: any) => {
-		// This will be implemented in the next step
 		console.log('Form data to submit:', formDataFromForm);
-		setIsEditMode(false);
+		setIsEditDialogOpen(false);
 	};
 
 	const generateClientSideId = (method: string, path: string): string => {
@@ -142,7 +146,6 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 	const handleCopyCurl = () => {
 		if (!openApiSpec) return;
 		try {
-			// **FIX: Correctly check typeof serverUrl**
 			const baseUrl =
 				typeof project?.serverUrl === 'string'
 					? project.serverUrl
@@ -183,7 +186,7 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 	const handleEnterEditMode = async () => {
 		try {
 			await acquireLockMutation.mutateAsync({ projectId, endpointId: endpoint.id });
-			setIsEditMode(true);
+			setIsEditDialogOpen(true);
 		} catch (err) {
 			let description = 'Could not acquire lock for editing. Please try again.';
 			if (err instanceof ApiError && err.status === 409) {
@@ -199,21 +202,22 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 		}
 	};
 
-	if (isEditMode && isProjectOwner(project)) {
-		return (
-			<Dialog open={isEditMode} onOpenChange={setIsEditMode}>
-				<DialogContent className="max-w-4xl w-[95vw] md:w-[90vw] lg:w-[80vw] xl:w-[70vw] p-0 max-h-[95vh] flex flex-col">
-					<EndpointForm
-						projectId={projectId}
-						endpoint={endpoint}
-						onClose={() => setIsEditMode(false)}
-						onSubmit={handleFormSubmit}
-						openApiSpec={openApiSpec}
-					/>
-				</DialogContent>
-			</Dialog>
-		);
-	}
+	const handleCloseEditDialog = () => {
+		if (endpoint) {
+			releaseLockMutation.mutate(
+				{
+					projectId,
+					endpointId: endpoint.id,
+				},
+				{
+					onError: (err) => {
+						console.error('Failed to release endpoint lock on dialog close:', err);
+					},
+				},
+			);
+		}
+		setIsEditDialogOpen(false);
+	};
 
 	return (
 		<div className="px-4 py-2" id={endpoint.id}>
@@ -402,6 +406,29 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 					</AlertDialog>
 				)}
 			</div>
+
+			{isProjectOwner(project) && (
+				<Dialog
+					open={isEditDialogOpen}
+					onOpenChange={(open) => {
+						if (!open && isEditDialogOpen) {
+							handleCloseEditDialog();
+						} else if (open) {
+							setIsEditDialogOpen(true);
+						}
+					}}
+				>
+					<DialogContent className="max-w-4xl w-[95vw] md:w-[90vw] lg:w-[80vw] xl:w-[70vw] p-0 max-h-[95vh] flex flex-col">
+						<EndpointForm
+							projectId={projectId}
+							endpoint={endpoint}
+							onClose={handleCloseEditDialog}
+							onSubmit={handleFormSubmit}
+							openApiSpec={openApiSpec}
+						/>
+					</DialogContent>
+				</Dialog>
+			)}
 		</div>
 	);
 };

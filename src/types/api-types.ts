@@ -608,17 +608,12 @@ export interface components {
             username: string;
             /** @enum {string} */
             role: "admin" | "member" | "guest";
-            profileImage?: Record<string, never> | null;
+            profileImage?: string | null;
             teams?: components["schemas"]["TeamDto"][];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
-        };
-        SanitizedUserDto: {
-            id: string;
-            username: string;
-            profileImage: Record<string, never> | null;
         };
         PaginationMetaDto: {
             /**
@@ -642,6 +637,11 @@ export interface components {
              */
             lastPage: number;
         };
+        SanitizedUserDto: {
+            id: string;
+            username: string;
+            profileImage: string | null;
+        };
         Object: Record<string, never>;
         ChangePasswordDto: {
             /** @description The user's current password */
@@ -656,18 +656,6 @@ export interface components {
         SetPasswordDto: {
             /** @description The desired new password for the account. */
             newPassword: string;
-        };
-        ProjectSummaryDto: {
-            id: string;
-            name: string;
-            description: Record<string, never> | null;
-            serverUrl: string | null;
-            /** Format: date-time */
-            createdAt: string;
-            /** Format: date-time */
-            updatedAt: string;
-            creator: components["schemas"]["SanitizedUserDto"];
-            updatedBy: components["schemas"]["SanitizedUserDto"];
         };
         ProjectLinkDto: {
             /** @example Gitlab Milestone */
@@ -684,16 +672,39 @@ export interface components {
             serverUrl?: string;
             links?: components["schemas"]["ProjectLinkDto"][];
         };
+        ProjectAccessControlListDto: {
+            /**
+             * @description A list of user IDs.
+             * @example [
+             *       "1",
+             *       "2"
+             *     ]
+             */
+            users?: string[];
+            /**
+             * @description A list of team IDs.
+             * @example [
+             *       "backend",
+             *       "UI"
+             *     ]
+             */
+            teams?: string[];
+        };
+        ProjectAccessDetailsDto: {
+            owners: components["schemas"]["ProjectAccessControlListDto"];
+            viewers: components["schemas"]["ProjectAccessControlListDto"];
+            deniedUsers: string[];
+        };
         ProjectDetailDto: {
             id: string;
             name: string;
-            description: Record<string, never> | null;
-            serverUrl: Record<string, never> | null;
+            description: string | null;
+            serverUrl: string | null;
             creator: components["schemas"]["SanitizedUserDto"];
             updatedBy: components["schemas"]["SanitizedUserDto"];
             links: components["schemas"]["ProjectLinkDto"][];
             /** @description The full Access Control List (ACL) for the project. */
-            access?: Record<string, never>;
+            access?: components["schemas"]["ProjectAccessDetailsDto"];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -725,6 +736,18 @@ export interface components {
                 [key: string]: unknown;
             } | null;
             meta: components["schemas"]["RequestMeta"];
+        };
+        ProjectSummaryDto: {
+            id: string;
+            name: string;
+            description: string | null;
+            serverUrl: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            creator: components["schemas"]["SanitizedUserDto"];
+            updatedBy: components["schemas"]["SanitizedUserDto"];
         };
         UpdateProjectDto: {
             /**
@@ -775,24 +798,6 @@ export interface components {
              */
             lastKnownUpdatedAt: string;
         };
-        ProjectAccessControlListDto: {
-            /**
-             * @description A list of user IDs.
-             * @example [
-             *       "1",
-             *       "2"
-             *     ]
-             */
-            users?: string[];
-            /**
-             * @description A list of team IDs.
-             * @example [
-             *       "backend",
-             *       "UI"
-             *     ]
-             */
-            teams?: string[];
-        };
         UpdateAccessDto: {
             /** @description The users and teams who have OWNER (write) access. */
             owners?: components["schemas"]["ProjectAccessControlListDto"];
@@ -835,6 +840,24 @@ export interface components {
              */
             tags?: string[];
         };
+        OpenApiOperationDto: {
+            tags?: string[];
+            summary?: string;
+            description?: string;
+            externalDocs?: Record<string, never>;
+            operationId?: string;
+            parameters?: components["schemas"]["ParameterObject"][];
+            requestBody?: components["schemas"]["RequestBodyObject"];
+            responses?: {
+                [key: string]: components["schemas"]["ResponseObject"];
+            };
+            callbacks?: Record<string, never>;
+            deprecated?: boolean;
+            security?: Record<string, never>[];
+            servers?: Record<string, never>[];
+        } & {
+            [key: string]: unknown;
+        };
         EndpointDto: {
             id: string;
             /** @example /users/{id} */
@@ -846,18 +869,8 @@ export interface components {
              * @enum {string}
              */
             status: "DRAFT" | "IN_REVIEW" | "PUBLISHED" | "DEPRECATED";
-            /**
-             * @description The OpenAPI Operation Object for this endpoint.
-             * @example {
-             *       "summary": "Get a specific user",
-             *       "responses": {
-             *         "200": {
-             *           "description": "User details"
-             *         }
-             *       }
-             *     }
-             */
-            operation: Record<string, never>;
+            /** @description The OpenAPI Operation Object for this endpoint. */
+            operation: components["schemas"]["OpenApiOperationDto"];
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -874,18 +887,8 @@ export interface components {
              * @enum {string}
              */
             method: "get" | "post" | "put" | "patch" | "delete" | "options" | "head" | "trace";
-            /**
-             * @description A valid OpenAPI Operation Object.
-             * @example {
-             *       "summary": "Get a specific user",
-             *       "responses": {
-             *         "200": {
-             *           "description": "User details"
-             *         }
-             *       }
-             *     }
-             */
-            operation: Record<string, never>;
+            /** @description A valid OpenAPI Operation Object. */
+            operation: components["schemas"]["OpenApiOperationDto"];
         };
         UpdateEndpointDto: {
             /** @example /users/new/{id} */
@@ -895,17 +898,8 @@ export interface components {
              * @enum {string}
              */
             method: "get" | "post" | "put" | "patch" | "delete" | "options" | "head" | "trace";
-            /**
-             * @example {
-             *       "summary": "Update a specific user",
-             *       "responses": {
-             *         "200": {
-             *           "description": "User updated"
-             *         }
-             *       }
-             *     }
-             */
-            operation: Record<string, never>;
+            /** @description A valid OpenAPI Operation Object. */
+            operation: components["schemas"]["OpenApiOperationDto"];
             /** @description The last `updatedAt` timestamp for optimistic concurrency control. */
             lastKnownUpdatedAt: string;
         };
@@ -976,7 +970,7 @@ export interface components {
         EnvironmentDto: {
             id: string;
             name: string;
-            description: Record<string, never> | null;
+            description: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -1015,7 +1009,7 @@ export interface components {
             id: number;
             key: string;
             value: string;
-            description: Record<string, never> | null;
+            description: string | null;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -1071,7 +1065,7 @@ export interface components {
         SchemaComponentDto: {
             id: string;
             name: string;
-            description: Record<string, never> | null;
+            description: string | null;
             schema: {
                 [key: string]: unknown;
             };
@@ -1172,6 +1166,33 @@ export interface components {
             isRead: boolean;
             readAt: Record<string, never> | null;
             actor: components["schemas"]["SanitizedUserDto"] | null;
+        };
+        ParameterObject: {
+            name: string;
+            /** @enum {string} */
+            in: "query" | "header" | "path" | "cookie";
+            description?: string;
+            required?: boolean;
+            schema?: Record<string, never>;
+        } & {
+            [key: string]: unknown;
+        };
+        RequestBodyObject: {
+            description?: string;
+            required?: boolean;
+            content: {
+                [key: string]: Record<string, never>;
+            };
+        } & {
+            [key: string]: unknown;
+        };
+        ResponseObject: {
+            description: string;
+            content?: {
+                [key: string]: Record<string, never>;
+            };
+        } & {
+            [key: string]: unknown;
         };
     };
     responses: never;

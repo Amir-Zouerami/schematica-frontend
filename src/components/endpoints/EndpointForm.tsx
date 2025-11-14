@@ -1,6 +1,5 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useCreateEndpoint, useUpdateEndpoint } from '@/hooks/api/useEndpoints';
-import { useReleaseLock } from '@/hooks/api/useLocking';
 import { useToast } from '@/hooks/use-toast';
 import { api, ApiError } from '@/utils/api';
 import { inferSchemaFromValue } from '@/utils/openApiUtils';
@@ -55,20 +54,15 @@ import FormResponsesSection, {
 	ManagedResponseUI as SectionManagedResponseUI,
 } from './FormSections/FormResponsesSection';
 
-// --- START: Corrected Type Definitions ---
-// These types inherit from the incorrect generated DTOs but fix the 'operation' property.
-type CorrectedCreateEndpointDto = Omit<components['schemas']['CreateEndpointDto'], 'operation'> & {
-	operation: OperationObject;
-};
-type CorrectedUpdateEndpointDto = Omit<components['schemas']['UpdateEndpointDto'], 'operation'> & {
-	operation: OperationObject;
-};
-// --- END: Corrected Type Definitions ---
-
+// --- START: Type Definitions ---
 type EndpointDto = components['schemas']['EndpointDto'];
+type CreateEndpointDto = components['schemas']['CreateEndpointDto'];
+type UpdateEndpointDto = components['schemas']['UpdateEndpointDto'];
+
 type ManagedParameterUI = SectionManagedParameterUI;
 type ManagedRequestBodyUI = SectionManagedRequestBodyUI;
 type ManagedResponseUI = SectionManagedResponseUI;
+// --- END: Type Definitions ---
 
 interface FullEndpointFormProps {
 	projectId: string;
@@ -94,7 +88,6 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 	const { toast } = useToast();
 	const createEndpointMutation = useCreateEndpoint();
 	const updateEndpointMutation = useUpdateEndpoint();
-	const releaseLockMutation = useReleaseLock();
 	const isSubmitting = createEndpointMutation.isPending || updateEndpointMutation.isPending;
 
 	const [path, setPath] = useState('');
@@ -118,28 +111,8 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 		[projectId, endpoint],
 	);
 
-	// Effect to automatically release the lock when the form is closed (unmounted).
-	useEffect(() => {
-		return () => {
-			if (endpoint) {
-				releaseLockMutation.mutate(
-					{
-						projectId,
-						endpointId: endpoint.id,
-					},
-					{
-						onError: (err) => {
-							// Silently log the error, as the user has already navigated away from the form.
-							console.error('Failed to release endpoint lock on form close:', err);
-						},
-					},
-				);
-			}
-		};
-	}, [projectId, endpoint, releaseLockMutation]);
-
 	const populateFormFields = (endpointData: EndpointDto | undefined) => {
-		const op = endpointData?.operation as OperationObject | undefined;
+		const op = endpointData?.operation as unknown as OperationObject | undefined;
 		setPath(endpointData?.path || '');
 		setMethod(endpointData?.method || 'get');
 		setSummary(op?.summary || '');
@@ -464,27 +437,29 @@ const EndpointForm: React.FC<FullEndpointFormProps> = ({
 				if (!lastKnownUpdatedAt && !forceOverwrite)
 					throw new Error('Missing last known update timestamp for concurrency control.');
 
-				const payload: CorrectedUpdateEndpointDto = {
+				const payload: UpdateEndpointDto = {
 					path,
-					method: method as CorrectedUpdateEndpointDto['method'],
-					operation: operationForBackend,
+					method: method as UpdateEndpointDto['method'],
+					operation:
+						operationForBackend as unknown as components['schemas']['OpenApiOperationDto'],
 					lastKnownUpdatedAt: forceOverwrite ? undefined : lastKnownUpdatedAt,
 				};
 				await updateEndpointMutation.mutateAsync({
 					projectId,
 					endpointId: endpoint.id,
-					endpointData: payload as any,
+					endpointData: payload,
 				});
 				toast({ title: 'Success', description: 'Endpoint updated successfully.' });
 			} else {
-				const payload: CorrectedCreateEndpointDto = {
+				const payload: CreateEndpointDto = {
 					path,
-					method: method as CorrectedCreateEndpointDto['method'],
-					operation: operationForBackend,
+					method: method as CreateEndpointDto['method'],
+					operation:
+						operationForBackend as unknown as components['schemas']['OpenApiOperationDto'],
 				};
 				await createEndpointMutation.mutateAsync({
 					projectId,
-					endpointData: payload as any,
+					endpointData: payload,
 				});
 				toast({ title: 'Success', description: 'Endpoint created successfully.' });
 			}
