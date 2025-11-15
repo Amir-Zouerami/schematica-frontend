@@ -603,7 +603,7 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
-        UserDto: {
+        MeDto: {
             id: string;
             username: string;
             /** @enum {string} */
@@ -614,6 +614,8 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+            /** @description Indicates whether the user has a password set (i.e., can use local login). Is `false` for users created via OAuth who have not set a password yet. */
+            hasPassword: boolean;
         };
         PaginationMetaDto: {
             /**
@@ -1123,6 +1125,18 @@ export interface components {
              */
             name: string;
         };
+        UserDto: {
+            id: string;
+            username: string;
+            /** @enum {string} */
+            role: "admin" | "member" | "guest";
+            profileImage?: string | null;
+            teams?: components["schemas"]["TeamDto"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
         /** @enum {string} */
         Role: "admin" | "member" | "guest";
         UpdateUserDto: {
@@ -1276,7 +1290,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["UserDto"];
+                    "application/json": components["schemas"]["MeDto"];
                 };
             };
         };
