@@ -2,14 +2,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
-	Command,
-	CommandEmpty,
-	CommandGroup,
-	CommandInput,
-	CommandItem,
-	CommandList,
-} from '@/components/ui/command';
-import {
 	Dialog,
 	DialogContent,
 	DialogDescription,
@@ -17,7 +9,6 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from '@/components/ui/dialog';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table';
 import { useUpdateProjectAccess } from '@/hooks/api/useProjects';
 import { useTeams } from '@/hooks/api/useTeams';
@@ -25,8 +16,9 @@ import { useUsers } from '@/hooks/api/useUsers';
 import { useToast } from '@/hooks/use-toast';
 import type { components } from '@/types/api-types';
 import { ApiError } from '@/utils/api';
-import { ChevronsUpDown, Users as TeamsIcon, X } from 'lucide-react';
+import { Users as TeamsIcon, X } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
+import UserTeamSelector from './UserTeamSelector'; // Import the new component
 
 // Correctly imported types
 type ProjectDetailDto = components['schemas']['ProjectDetailDto'];
@@ -47,62 +39,8 @@ interface ProjectAccessFormProps {
 	onClose: () => void;
 }
 
-const Selector = ({
-	items,
-	onSelect,
-	disabledIds,
-	triggerText,
-}: {
-	items: { id: string; name: string }[];
-	onSelect: (id: string) => void;
-	disabledIds: string[];
-	triggerText: string;
-}) => {
-	const [open, setOpen] = useState(false);
-	const availableItems = items.filter((item) => !disabledIds.includes(item.id));
-
-	return (
-		<Popover open={open} onOpenChange={setOpen}>
-			<PopoverTrigger asChild>
-				<Button
-					variant="outline"
-					role="combobox"
-					aria-expanded={open}
-					className="w-[150px] justify-between"
-				>
-					{triggerText}
-					<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-				</Button>
-			</PopoverTrigger>
-
-			<PopoverContent className="w-[200px] p-0">
-				<Command>
-					<CommandInput placeholder={`Search ${triggerText.toLowerCase()}...`} />
-
-					<CommandList>
-						<CommandEmpty>No results found.</CommandEmpty>
-						<CommandGroup>
-							{availableItems.map((item) => (
-								<CommandItem
-									key={item.id}
-									value={item.name}
-									onSelect={() => {
-										onSelect(item.id);
-										setOpen(false);
-									}}
-								>
-									{item.name}
-								</CommandItem>
-							))}
-						</CommandGroup>
-					</CommandList>
-				</Command>
-			</PopoverContent>
-		</Popover>
-	);
-};
-
 const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, onClose }) => {
+	// These hooks are now only used to get the names/images for the display list, not for the selector.
 	const { data: usersResponse } = useUsers();
 	const { data: teamsResponse } = useTeams();
 	const allUsers = usersResponse?.data || [];
@@ -126,6 +64,8 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 	const getUserById = (id: string): SanitizedUserDto | undefined =>
 		allUsers.find((u) => u.id === id);
 
+	const getTeamById = (id: string): TeamDto | undefined => allTeams.find((t) => t.id === id);
+
 	const handleModify = (
 		action: 'add' | 'remove',
 		list: keyof AccessControlState,
@@ -133,27 +73,32 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 		value: string,
 	) => {
 		setAccess((prev) => {
-			const newAccess = { ...prev };
+			const newAccess = JSON.parse(JSON.stringify(prev)); // Deep copy
 
 			if (type === 'teams' && list !== 'deniedUsers') {
-				const currentList = newAccess[list].teams;
+				const currentList = newAccess[list].teams as string[];
 				if (action === 'add' && !currentList.includes(value)) {
-					newAccess[list].teams = [...currentList, value];
+					newAccess[list].teams.push(value);
 				} else if (action === 'remove') {
 					newAccess[list].teams = currentList.filter((item) => item !== value);
 				}
 			} else if (type === 'users') {
 				const listKey = list as 'owners' | 'viewers' | 'deniedUsers';
-				const currentList =
-					listKey === 'deniedUsers' ? newAccess.deniedUsers : newAccess[listKey].users;
 
-				if (action === 'add' && !currentList.includes(value)) {
-					if (listKey === 'deniedUsers') newAccess.deniedUsers = [...currentList, value];
-					else newAccess[listKey].users = [...currentList, value];
-				} else if (action === 'remove') {
-					const filteredList = currentList.filter((item) => item !== value);
-					if (listKey === 'deniedUsers') newAccess.deniedUsers = filteredList;
-					else newAccess[listKey].users = filteredList;
+				if (listKey === 'deniedUsers') {
+					const currentList = newAccess.deniedUsers as string[];
+					if (action === 'add' && !currentList.includes(value)) {
+						newAccess.deniedUsers.push(value);
+					} else if (action === 'remove') {
+						newAccess.deniedUsers = currentList.filter((item) => item !== value);
+					}
+				} else {
+					const currentList = newAccess[listKey].users as string[];
+					if (action === 'add' && !currentList.includes(value)) {
+						newAccess[listKey].users.push(value);
+					} else if (action === 'remove') {
+						newAccess[listKey].users = currentList.filter((item) => item !== value);
+					}
 				}
 			}
 			return newAccess;
@@ -197,14 +142,14 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 				<CardHeader className="flex flex-row items-center justify-between pb-2">
 					<CardTitle className="text-base font-medium">{title}</CardTitle>
 					<div className="flex gap-2">
-						<Selector
-							items={allUsers.map((u) => ({ id: u.id, name: u.username }))}
+						<UserTeamSelector
+							type="user"
 							onSelect={(id) => handleModify('add', list, 'users', id)}
 							disabledIds={allAssignedUserIds}
 							triggerText="Add User"
 						/>
-						<Selector
-							items={allTeams.map((t) => ({ id: t.id, name: t.name }))}
+						<UserTeamSelector
+							type="team"
 							onSelect={(id) => handleModify('add', list, 'teams', id)}
 							disabledIds={allAssignedTeamIds}
 							triggerText="Add Team"
@@ -266,7 +211,7 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 									})}
 
 									{teamItems.map((teamId) => {
-										const team = allTeams.find((t) => t.id === teamId);
+										const team = getTeamById(teamId);
 										return (
 											<TableRow key={`team-${teamId}`}>
 												<TableCell className="flex items-center gap-2 py-2">
@@ -322,8 +267,8 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 					<Card>
 						<CardHeader className="flex flex-row items-center justify-between pb-2">
 							<CardTitle className="text-base font-medium">Denied Users</CardTitle>
-							<Selector
-								items={allUsers.map((u) => ({ id: u.id, name: u.username }))}
+							<UserTeamSelector
+								type="user"
 								onSelect={(id) => handleModify('add', 'deniedUsers', 'users', id)}
 								disabledIds={[
 									...access.owners.users,

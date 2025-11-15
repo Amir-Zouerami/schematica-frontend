@@ -6,7 +6,9 @@ import { InfiniteData, useQueryClient } from '@tanstack/react-query';
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 
-type User = components['schemas']['UserDto'];
+// --- TYPE UPDATE ---
+// The authenticated user object now uses the more detailed MeDto
+type User = components['schemas']['MeDto'];
 type ChangePasswordDto = components['schemas']['ChangePasswordDto'];
 type NotificationDto = components['schemas']['NotificationDto'];
 
@@ -16,12 +18,13 @@ type NotificationsResponse = {
 };
 
 interface AuthContextType {
-	user: User | null;
+	user: User | null; // This now refers to MeDto
 	isAuthenticated: boolean;
 	isLoading: boolean;
 	login: (username: string, password: string) => Promise<void>;
 	logout: () => void;
 	changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+	handleOAuthCallback: (token: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -44,18 +47,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 			path: '/socket.io',
 			auth: { token: localStorage.getItem('token') },
 		});
-
-		// socket.on('connect', () => {
-		// 	console.log(`WebSocket connected successfully to ${backendUrl} with path /socket.io/`);
-		// });
-
-		// socket.on('disconnect', (reason) => {
-		// 	console.log(`WebSocket disconnected: ${reason}`);
-		// });
-
-		// socket.on('connect_error', (error) => {
-		// 	console.error('WebSocket connection error:', error.message);
-		// });
 
 		socket.on('notification', (newNotification: NotificationDto) => {
 			console.log('New notification received:', newNotification);
@@ -86,9 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 					const firstPage = oldData.pages[0];
 					const existingArray = firstPage?.data?.data;
-
 					const safeArray = Array.isArray(existingArray) ? existingArray : [];
-
 					const updatedFirstPage = {
 						...firstPage,
 						data: {
@@ -129,6 +118,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 			}
 
 			try {
+				// --- TYPE UPDATE ---
+				// Fetching the user profile now expects the MeDto type
 				const response = await api.get<User>('/auth/me');
 				setUser(response.data);
 				setIsAuthenticated(true);
@@ -152,6 +143,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 			const token = loginResponse.data.access_token;
 			localStorage.setItem('token', token);
 
+			// --- TYPE UPDATE ---
 			const profileResponse = await api.get<User>('/auth/me');
 			setUser(profileResponse.data);
 			setIsAuthenticated(true);
@@ -170,6 +162,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 				variant: 'destructive',
 			});
 			throw error;
+		} finally {
+			setIsLoading(false);
+		}
+	};
+
+	const handleOAuthCallback = async (token: string) => {
+		setIsLoading(true);
+		try {
+			localStorage.setItem('token', token);
+			// --- TYPE UPDATE ---
+			const profileResponse = await api.get<User>('/auth/me');
+			setUser(profileResponse.data);
+			setIsAuthenticated(true);
+
+			toast({
+				title: 'Login successful',
+				description: `Welcome, ${profileResponse.data.username}!`,
+				duration: 2000,
+			});
+		} catch (error) {
+			performLogout();
+			throw new Error('The provided authentication token is invalid or has expired.');
 		} finally {
 			setIsLoading(false);
 		}
@@ -204,6 +218,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 				login,
 				logout,
 				changePassword,
+				handleOAuthCallback,
 			}}
 		>
 			{children}

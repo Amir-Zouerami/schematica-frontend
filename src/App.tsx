@@ -14,6 +14,7 @@ import { ApiError } from './utils/api';
 
 // --- Lazy-loaded and Prefetched Page Components ---
 const LoginPage = lazy(() => import(/* @vite-prefetch */ '@/pages/LoginPage'));
+const AuthCallbackPage = lazy(() => import(/* @vite-prefetch */ '@/pages/AuthCallbackPage'));
 const ProjectsPage = lazy(() => import(/* @vite-prefetch */ './pages/ProjectsPage'));
 const ProjectDetailPage = lazy(() => import(/* @vite-prefetch */ './pages/ProjectDetailPage'));
 const AdminPage = lazy(() => import(/* @vite-prefetch */ './pages/AdminPage'));
@@ -44,7 +45,7 @@ const App = () => {
 							<Suspense fallback={<PageLoader />}>
 								<Routes>
 									<Route path="/login" element={<LoginPage />} />
-
+									<Route path="/auth/callback" element={<AuthCallbackPage />} />
 									<Route element={<ProtectedRoute />}>
 										<Route element={<Layout />}>
 											<Route path="/" element={<ProjectsPage />} />
