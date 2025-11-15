@@ -1,6 +1,7 @@
 /* eslint-disable no-case-declarations,no-prototype-builtins */
 
-import { toJsonObject, ParsedCurlCommand } from '@/lib/curlconverter-wrapper';
+import { ParsedCurlCommand, toJsonObject } from '@/lib/curlconverter-wrapper';
+import type { components } from '@/types/api-types';
 import {
 	ExampleObject,
 	OpenAPISpec,
@@ -14,6 +15,10 @@ import {
 import YAML from 'js-yaml';
 import { v4 as uuidv4 } from 'uuid';
 import { isRefObject, resolveRef } from './schemaUtils';
+
+// Get the specific type for the method from our generated API types
+type CreateEndpointDto = components['schemas']['CreateEndpointDto'];
+type HttpMethod = CreateEndpointDto['method'];
 
 const isPlainObject = (value: any): value is object =>
 	value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -447,7 +452,11 @@ export const inferSchemaFromValue = (value: any): SchemaObject => {
 export const parseCurlToOpenApi = (
 	curlCommand: string,
 	createdByUsername: string,
-): { path: string; method: string; operation: OperationObject } | null => {
+): {
+	path: string;
+	method: HttpMethod;
+	operation: components['schemas']['OpenApiOperationDto'];
+} | null => {
 	try {
 		const commandToParse = curlCommand.replace(/\\\r?\n/g, ' ').trim();
 		if (!commandToParse.toLowerCase().startsWith('curl')) {
@@ -462,11 +471,7 @@ export const parseCurlToOpenApi = (
 		let urlObject;
 		try {
 			let tempUrl = parsedCurl.raw_url || parsedCurl.url;
-
-			if (!tempUrl) {
-				return null;
-			}
-
+			if (!tempUrl) return null;
 			if (!/^https?:\/\//i.test(tempUrl)) tempUrl = 'http://' + tempUrl;
 			urlObject = new URL(tempUrl);
 		} catch (e) {
@@ -492,7 +497,6 @@ export const parseCurlToOpenApi = (
 		}
 
 		let requestContentTypeFromHeader: string | undefined = undefined;
-
 		if (parsedCurl.headers) {
 			for (const key in parsedCurl.headers) {
 				if (Object.hasOwnProperty.call(parsedCurl.headers, key)) {
@@ -510,7 +514,6 @@ export const parseCurlToOpenApi = (
 							schema: { type: 'string', example: String(parsedCurl.headers[key]) },
 						});
 					}
-
 					if (lowerKey === 'content-type') {
 						requestContentTypeFromHeader = String(parsedCurl.headers[key])
 							.split(';')[0]
@@ -521,7 +524,6 @@ export const parseCurlToOpenApi = (
 		}
 
 		let requestBody: RequestBodyObject | undefined = undefined;
-
 		if (parsedCurl.data !== undefined && parsedCurl.data !== null) {
 			let actualContentType = requestContentTypeFromHeader || 'application/octet-stream';
 			let exampleValue = parsedCurl.data;
@@ -534,16 +536,9 @@ export const parseCurlToOpenApi = (
 			} else if (typeof parsedCurl.data === 'string') {
 				try {
 					const jsonData = JSON.parse(parsedCurl.data);
-
-					if (isPlainObject(jsonData) || Array.isArray(jsonData)) {
-						actualContentType = requestContentTypeFromHeader || 'application/json';
-						inferredSchema = inferSchemaFromValue(jsonData);
-						exampleValue = jsonData;
-					} else {
-						actualContentType = requestContentTypeFromHeader || 'text/plain';
-						inferredSchema = { type: 'string' };
-						exampleValue = parsedCurl.data;
-					}
+					actualContentType = requestContentTypeFromHeader || 'application/json';
+					inferredSchema = inferSchemaFromValue(jsonData);
+					exampleValue = jsonData;
 				} catch (e) {
 					actualContentType = requestContentTypeFromHeader || 'text/plain';
 					inferredSchema = { type: 'string' };
@@ -555,11 +550,11 @@ export const parseCurlToOpenApi = (
 			};
 		}
 
-		const operation: OperationObject = {
+		const operation: components['schemas']['OpenApiOperationDto'] = {
 			summary: `Imported from cURL (${(parsedCurl.method || 'GET').toUpperCase()} ${urlObject.pathname})`,
 			description: `Generated from cURL command:\n\`\`\`bash\n${curlCommand}\n\`\`\``,
-			parameters: parameters.length > 0 ? parameters : undefined,
-			requestBody: requestBody,
+			parameters: parameters.length > 0 ? (parameters as any) : undefined,
+			requestBody: requestBody as any,
 			responses: { '200': { description: 'Successful response' } },
 			'x-app-metadata': {
 				createdBy: createdByUsername,
@@ -572,20 +567,18 @@ export const parseCurlToOpenApi = (
 
 		return {
 			path: urlObject.pathname,
-			method: (parsedCurl.method || 'get').toLowerCase(),
+			method: (parsedCurl.method || 'get').toLowerCase() as HttpMethod,
 			operation: operation,
 		};
 	} catch (error) {
 		if (error instanceof Error && error.message.includes('Invalid URL')) {
 			console.error(
-				'Hint: Ensure the URL in the cURL command includes a scheme (http:// or https://) or is a valid hostname.',
+				'Hint: Ensure the URL in the cURL command includes a scheme (http:// or https://).',
 			);
 		}
-
 		if (error instanceof Error && error.message.startsWith('Invalid cURL command:')) {
 			throw error;
 		}
-
 		return null;
 	}
 };

@@ -2,8 +2,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSetPassword } from '@/hooks/api/useUsers';
 import { useToast } from '@/hooks/use-toast';
 import { ApiError } from '@/utils/api';
+import { zodResolver } from '@hookform/resolvers/zod';
 import React, { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
+import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -14,14 +17,51 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from '@/components/ui/dialog';
+import {
+	Form,
+	FormControl,
+	FormField,
+	FormItem,
+	FormLabel,
+	FormMessage,
+} from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 
 interface ChangePasswordModalProps {
 	isOpen: boolean;
 	onClose: () => void;
 	redirectTo?: string;
 }
+
+// A factory function to create a Zod schema based on the form mode
+const getFormSchema = (mode: 'change' | 'set') => {
+	let schema = z
+		.object({
+			currentPassword: z.string().optional(),
+			newPassword: z
+				.string()
+				.min(8, { message: 'New password must be at least 8 characters long.' }),
+			confirmPassword: z.string(),
+		})
+		.refine((data) => data.newPassword === data.confirmPassword, {
+			message: 'New passwords do not match.',
+			path: ['confirmPassword'],
+		});
+
+	if (mode === 'change') {
+		schema = schema
+			.refine((data) => data.currentPassword && data.currentPassword.length > 0, {
+				message: 'Current password is required.',
+				path: ['currentPassword'],
+			})
+			.refine((data) => data.currentPassword !== data.newPassword, {
+				message: 'New password cannot be the same as the current password.',
+				path: ['newPassword'],
+			});
+	}
+
+	return schema;
+};
 
 const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 	isOpen,
@@ -34,62 +74,38 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 	const navigate = useNavigate();
 
 	const [formMode, setFormMode] = useState<'change' | 'set'>('change');
-	const [currentPassword, setCurrentPassword] = useState('');
-	const [newPassword, setNewPassword] = useState('');
-	const [confirmPassword, setConfirmPassword] = useState('');
-	const [isLoading, setIsLoading] = useState(false);
+
+	const formSchema = getFormSchema(formMode);
+	type FormValues = z.infer<typeof formSchema>;
+
+	const form = useForm<FormValues>({
+		resolver: zodResolver(formSchema),
+		defaultValues: {
+			currentPassword: '',
+			newPassword: '',
+			confirmPassword: '',
+		},
+	});
+
+	const { isSubmitting } = form.formState;
 
 	useEffect(() => {
 		if (isOpen) {
+			// Reset the form state whenever the modal is opened
+			form.reset();
 			setFormMode('change');
-			setCurrentPassword('');
-			setNewPassword('');
-			setConfirmPassword('');
-			setIsLoading(false);
 		}
-	}, [isOpen]);
+	}, [isOpen, form]);
 
-	const handleModalClose = () => {
-		if (!isLoading) {
-			onClose();
-		}
-	};
+	// Re-validate the form if the mode changes (e.g., from 'change' to 'set')
+	useEffect(() => {
+		form.trigger();
+	}, [formMode, form.trigger]);
 
-	const handleSubmit = async (e: React.FormEvent) => {
-		e.preventDefault();
-
-		if (newPassword !== confirmPassword) {
-			toast({
-				title: 'Validation Error',
-				description: 'New passwords do not match.',
-				variant: 'destructive',
-			});
-			return;
-		}
-
-		if (newPassword.length < 8) {
-			toast({
-				title: 'Validation Error',
-				description: 'New password must be at least 8 characters long.',
-				variant: 'destructive',
-			});
-			return;
-		}
-
-		if (formMode === 'change' && currentPassword === newPassword) {
-			toast({
-				title: 'Validation Error',
-				description: 'New password cannot be the same as the current password.',
-				variant: 'destructive',
-			});
-			return;
-		}
-
-		setIsLoading(true);
-
+	const onSubmit = async (values: FormValues) => {
 		if (formMode === 'change') {
 			try {
-				await changePassword(currentPassword, newPassword);
+				await changePassword(values.currentPassword!, values.newPassword);
 				toast({
 					title: 'Password Changed Successfully',
 					description: 'Your password has been updated. You will now be logged out.',
@@ -104,6 +120,7 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 					err.errorResponse?.type === 'OAUTH_USER_NO_PASSWORD_SET'
 				) {
 					setFormMode('set');
+					form.clearErrors(); // Clear validation errors for the new mode
 					toast({
 						title: 'Set Your Password',
 						description:
@@ -112,22 +129,17 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 				} else {
 					const errorMessage =
 						err instanceof ApiError ? err.message : 'An unexpected error occurred.';
-					toast({
-						title: 'Change Password Failed',
-						description: errorMessage,
-						variant: 'destructive',
-					});
+					form.setError('currentPassword', { type: 'server', message: errorMessage });
 				}
-			} finally {
-				setIsLoading(false);
 			}
 		} else {
+			// 'set' mode
 			try {
-				await setPasswordMutation.mutateAsync({ newPassword });
+				await setPasswordMutation.mutateAsync({ newPassword: values.newPassword });
 				toast({
 					title: 'Password Set Successfully',
 					description:
-						'Your password has been set. You will be logged out to log in again with your new credentials.',
+						'Your password has been set. You will be logged out to log in again.',
 					duration: 3000,
 				});
 				await logout();
@@ -136,26 +148,13 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 			} catch (err) {
 				const errorMessage =
 					err instanceof ApiError ? err.message : 'An unexpected error occurred.';
-				toast({
-					title: 'Set Password Failed',
-					description: errorMessage,
-					variant: 'destructive',
-				});
-			} finally {
-				setIsLoading(false);
+				form.setError('root.serverError', { message: errorMessage });
 			}
 		}
 	};
 
 	return (
-		<Dialog
-			open={isOpen}
-			onOpenChange={(open) => {
-				if (!open) {
-					handleModalClose();
-				}
-			}}
-		>
+		<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
 			<DialogContent className="sm:max-w-md max-w-4xl">
 				<DialogHeader>
 					<DialogTitle>
@@ -164,67 +163,93 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 					<DialogDescription>
 						{formMode === 'change'
 							? 'Enter your current password and choose a new password.'
-							: 'Choose a password for your account to enable logging in with a username and password.'}
+							: 'Choose a password for your account to enable logging in locally.'}
 						{' The new password must be at least 8 characters long.'}
 					</DialogDescription>
 				</DialogHeader>
-				<form onSubmit={handleSubmit} className="space-y-4 pt-2">
-					{formMode === 'change' && (
-						<div className="space-y-2">
-							<Label htmlFor="currentPassword">Current Password</Label>
-							<Input
-								id="currentPassword"
-								type="password"
-								value={currentPassword}
-								onChange={(e) => setCurrentPassword(e.target.value)}
-								required
-								disabled={isLoading}
-								autoComplete="current-password"
+				<Form {...form}>
+					<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
+						{form.formState.errors.root?.serverError && (
+							<p className="text-sm font-medium text-red-500 dark:text-red-400">
+								{form.formState.errors.root.serverError.message}
+							</p>
+						)}
+
+						{formMode === 'change' && (
+							<FormField
+								control={form.control}
+								name="currentPassword"
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Current Password</FormLabel>
+										<FormControl>
+											<Input
+												type="password"
+												autoComplete="current-password"
+												{...field}
+											/>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
 							/>
-						</div>
-					)}
-					<div className="space-y-2">
-						<Label htmlFor="newPassword">New Password</Label>
-						<Input
-							id="newPassword"
-							type="password"
-							value={newPassword}
-							onChange={(e) => setNewPassword(e.target.value)}
-							required
-							disabled={isLoading}
-							autoComplete="new-password"
+						)}
+
+						<FormField
+							control={form.control}
+							name="newPassword"
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>New Password</FormLabel>
+									<FormControl>
+										<Input
+											type="password"
+											autoComplete="new-password"
+											{...field}
+										/>
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
 						/>
-					</div>
-					<div className="space-y-2">
-						<Label htmlFor="confirmPassword">Confirm New Password</Label>
-						<Input
-							id="confirmPassword"
-							type="password"
-							value={confirmPassword}
-							onChange={(e) => setConfirmPassword(e.target.value)}
-							required
-							disabled={isLoading}
-							autoComplete="new-password"
+
+						<FormField
+							control={form.control}
+							name="confirmPassword"
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>Confirm New Password</FormLabel>
+									<FormControl>
+										<Input
+											type="password"
+											autoComplete="new-password"
+											{...field}
+										/>
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
 						/>
-					</div>
-					<DialogFooter className="mt-6">
-						<Button
-							type="button"
-							variant="outline"
-							onClick={handleModalClose}
-							disabled={isLoading}
-						>
-							Cancel
-						</Button>
-						<Button type="submit" disabled={isLoading}>
-							{isLoading
-								? 'Saving...'
-								: formMode === 'change'
-									? 'Change Password'
-									: 'Set Password'}
-						</Button>
-					</DialogFooter>
-				</form>
+
+						<DialogFooter className="mt-6">
+							<Button
+								type="button"
+								variant="outline"
+								onClick={onClose}
+								disabled={isSubmitting}
+							>
+								Cancel
+							</Button>
+							<Button type="submit" disabled={isSubmitting}>
+								{isSubmitting
+									? 'Saving...'
+									: formMode === 'change'
+										? 'Change Password'
+										: 'Set Password'}
+							</Button>
+						</DialogFooter>
+					</form>
+				</Form>
 			</DialogContent>
 		</Dialog>
 	);

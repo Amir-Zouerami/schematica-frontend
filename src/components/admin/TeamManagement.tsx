@@ -2,8 +2,11 @@ import { useCreateTeam, useDeleteTeam, useTeams, useUpdateTeam } from '@/hooks/a
 import { useToast } from '@/hooks/use-toast';
 import type { components } from '@/types/api-types';
 import { ApiError } from '@/utils/api';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Edit, PlusCircle, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +18,14 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from '@/components/ui/dialog';
+import {
+	Form,
+	FormControl,
+	FormField,
+	FormItem,
+	FormLabel,
+	FormMessage,
+} from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
 	Table,
@@ -27,6 +38,12 @@ import {
 
 type TeamDto = components['schemas']['TeamDto'];
 
+// 1. Define the Zod schema for the form
+const teamFormSchema = z.object({
+	name: z.string().min(1, { message: 'Team name cannot be empty.' }),
+});
+type TeamFormValues = z.infer<typeof teamFormSchema>;
+
 const TeamManagement = () => {
 	const { data: response, isLoading, error } = useTeams();
 	const teams = response?.data || [];
@@ -36,65 +53,67 @@ const TeamManagement = () => {
 	const updateTeamMutation = useUpdateTeam();
 	const deleteTeamMutation = useDeleteTeam();
 
-	const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-	const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+	const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
 	const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-	const [newTeamName, setNewTeamName] = useState('');
 	const [editingTeam, setEditingTeam] = useState<TeamDto | null>(null);
 	const [deletingTeam, setDeletingTeam] = useState<TeamDto | null>(null);
 
-	const handleCreate = async () => {
-		if (!newTeamName.trim()) {
-			toast({
-				title: 'Error',
-				description: 'Team name cannot be empty.',
-				variant: 'destructive',
-				duration: 2000,
-			});
-			return;
-		}
-		try {
-			await createTeamMutation.mutateAsync({ name: newTeamName });
-			toast({ title: 'Success', description: 'Team created successfully.' });
+	// 2. Initialize the form with react-hook-form
+	const form = useForm<TeamFormValues>({
+		resolver: zodResolver(teamFormSchema),
+		defaultValues: {
+			name: '',
+		},
+	});
 
-			setIsCreateDialogOpen(false);
-			setNewTeamName('');
-		} catch (err) {
-			const errorMessage = err instanceof ApiError ? err.message : 'Failed to create team.';
-			toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+	const { isSubmitting } = form.formState;
+
+	// Reset form state when the dialog opens or closes
+	useEffect(() => {
+		if (isFormDialogOpen) {
+			if (editingTeam) {
+				form.reset({ name: editingTeam.name });
+			} else {
+				form.reset({ name: '' });
+			}
 		}
+	}, [isFormDialogOpen, editingTeam, form]);
+
+	const openCreateDialog = () => {
+		setEditingTeam(null);
+		setIsFormDialogOpen(true);
 	};
 
-	const handleEdit = (team: TeamDto) => {
+	const openEditDialog = (team: TeamDto) => {
 		setEditingTeam(team);
-		setNewTeamName(team.name);
-		setIsEditDialogOpen(true);
+		setIsFormDialogOpen(true);
 	};
 
-	const handleUpdate = async () => {
-		if (!editingTeam || !newTeamName.trim()) {
-			toast({
-				title: 'Error',
-				description: 'Team name cannot be empty.',
-				variant: 'destructive',
-			});
-			return;
-		}
-
+	// 3. Define the submit handler
+	const onSubmit = async (values: TeamFormValues) => {
 		try {
-			await updateTeamMutation.mutateAsync({
-				teamId: editingTeam.id,
-				teamData: { name: newTeamName },
-			});
-
-			toast({ title: 'Success', description: 'Team updated successfully.' });
-			setIsEditDialogOpen(false);
-			setEditingTeam(null);
-			setNewTeamName('');
+			if (editingTeam) {
+				// Update existing team
+				await updateTeamMutation.mutateAsync({
+					teamId: editingTeam.id,
+					teamData: { name: values.name },
+				});
+				toast({ title: 'Success', description: 'Team updated successfully.' });
+			} else {
+				// Create new team
+				await createTeamMutation.mutateAsync({ name: values.name });
+				toast({ title: 'Success', description: 'Team created successfully.' });
+			}
+			setIsFormDialogOpen(false);
 		} catch (err) {
-			const errorMessage = err instanceof ApiError ? err.message : 'Failed to update team.';
-			toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+			const apiError = err as ApiError;
+			if (apiError.status === 409) {
+				form.setError('name', { type: 'server', message: apiError.message });
+			} else {
+				const errorMessage = apiError.message || 'An unexpected error occurred.';
+				toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+			}
 		}
 	};
 
@@ -108,7 +127,6 @@ const TeamManagement = () => {
 
 		try {
 			await deleteTeamMutation.mutateAsync(deletingTeam.id);
-
 			toast({ title: 'Success', description: 'Team deleted successfully.' });
 			setIsDeleteDialogOpen(false);
 			setDeletingTeam(null);
@@ -139,7 +157,7 @@ const TeamManagement = () => {
 			<CardHeader>
 				<CardTitle className="flex justify-between items-center">
 					Teams
-					<Button onClick={() => setIsCreateDialogOpen(true)}>
+					<Button onClick={openCreateDialog}>
 						<PlusCircle className="mr-2 h-4 w-4" /> Create Team
 					</Button>
 				</CardTitle>
@@ -167,16 +185,14 @@ const TeamManagement = () => {
 							teams.map((team) => (
 								<TableRow key={team.id}>
 									<TableCell className="font-medium">{team.name}</TableCell>
-
 									<TableCell className="text-right">
 										<Button
 											variant="ghost"
 											size="icon"
-											onClick={() => handleEdit(team)}
+											onClick={() => openEditDialog(team)}
 										>
 											<Edit className="h-4 w-4" />
 										</Button>
-
 										<Button
 											variant="ghost"
 											size="icon"
@@ -193,74 +209,70 @@ const TeamManagement = () => {
 				</Table>
 			</CardContent>
 
-			<Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+			{/* Form Dialog for Create/Edit */}
+			<Dialog open={isFormDialogOpen} onOpenChange={setIsFormDialogOpen}>
 				<DialogContent className="max-w-3xl">
 					<DialogHeader>
-						<DialogTitle>Create New Team</DialogTitle>
+						<DialogTitle>
+							{editingTeam ? `Edit Team: ${editingTeam.name}` : 'Create New Team'}
+						</DialogTitle>
 					</DialogHeader>
-
-					<div className="py-4">
-						<Input
-							placeholder="Team name"
-							value={newTeamName}
-							onChange={(e) => setNewTeamName(e.target.value)}
-						/>
-					</div>
-
-					<DialogFooter>
-						<Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-							Cancel
-						</Button>
-
-						<Button onClick={handleCreate} disabled={createTeamMutation.isPending}>
-							{createTeamMutation.isPending ? 'Creating...' : 'Create'}
-						</Button>
-					</DialogFooter>
+					<Form {...form}>
+						<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
+							<FormField
+								control={form.control}
+								name="name"
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Team Name</FormLabel>
+										<FormControl>
+											<Input
+												placeholder="e.g., Frontend Developers"
+												{...field}
+											/>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+							<DialogFooter>
+								<Button
+									type="button"
+									variant="outline"
+									onClick={() => setIsFormDialogOpen(false)}
+									disabled={isSubmitting}
+								>
+									Cancel
+								</Button>
+								<Button type="submit" disabled={isSubmitting}>
+									{isSubmitting
+										? editingTeam
+											? 'Updating...'
+											: 'Creating...'
+										: editingTeam
+											? 'Update'
+											: 'Create'}
+								</Button>
+							</DialogFooter>
+						</form>
+					</Form>
 				</DialogContent>
 			</Dialog>
 
-			<Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-				<DialogContent className="max-w-3xl">
-					<DialogHeader>
-						<DialogTitle>Edit Team: {editingTeam?.name}</DialogTitle>
-					</DialogHeader>
-
-					<div className="py-4">
-						<Input
-							placeholder="New team name"
-							value={newTeamName}
-							onChange={(e) => setNewTeamName(e.target.value)}
-						/>
-					</div>
-
-					<DialogFooter>
-						<Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-							Cancel
-						</Button>
-
-						<Button onClick={handleUpdate} disabled={updateTeamMutation.isPending}>
-							{updateTeamMutation.isPending ? 'Updating...' : 'Update'}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
-
+			{/* Delete Confirmation Dialog */}
 			<Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
 				<DialogContent className="max-w-3xl">
 					<DialogHeader>
 						<DialogTitle>Are you sure?</DialogTitle>
-
 						<DialogDescription className="py-1 leading-6">
 							This will permanently delete the team "{deletingTeam?.name}". This
-							action will remove the team from all users and cannot be undone.
+							action cannot be undone.
 						</DialogDescription>
 					</DialogHeader>
-
 					<DialogFooter>
 						<Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
 							Cancel
 						</Button>
-
 						<Button
 							variant="destructive"
 							onClick={confirmDelete}

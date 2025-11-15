@@ -1,8 +1,6 @@
-import React from 'react';
-import { Trash } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { ParameterObject } from '@/types/types';
 import { Button } from '@/components/ui/button';
+import { FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import {
 	Table,
@@ -12,153 +10,119 @@ import {
 	TableHeader,
 	TableRow,
 } from '@/components/ui/table';
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from '@/components/ui/select';
-
-export interface ManagedParameterUI extends ParameterObject {
-	_id: string;
-}
+import { Trash } from 'lucide-react';
+import React from 'react';
+import { useFieldArray, useFormContext } from 'react-hook-form';
 
 interface FormParametersSectionProps {
-	parameters: ManagedParameterUI[];
-	onAddParameter: (paramType: 'path' | 'query' | 'header') => void;
-	onRemoveParameter: (id: string) => void;
-	onUpdateParameter: (
-		id: string,
-		field: keyof Omit<ManagedParameterUI, '_id'>,
-		value: any,
-	) => void;
-	isSubmittingForm: boolean;
+	paramType: 'path' | 'query' | 'header';
 }
 
-const FormParametersSection: React.FC<FormParametersSectionProps> = ({
-	parameters,
-	onAddParameter,
-	onRemoveParameter,
-	onUpdateParameter,
-	isSubmittingForm,
-}) => {
+const FormParametersSection: React.FC<FormParametersSectionProps> = ({ paramType }) => {
+	const { control, formState } = useFormContext();
+	const { fields, append, remove } = useFieldArray({
+		control,
+		name: 'parameters',
+	});
+
+	const { isSubmitting } = formState;
+
+	const filteredFields = fields
+		.map((field, index) => ({ ...field, originalIndex: index }))
+		.filter((field: any) => field.in === paramType);
+
+	const addParameter = () => {
+		append({
+			name: '',
+			in: paramType,
+			required: paramType === 'path',
+			description: '',
+			schema: { type: 'string' },
+		});
+	};
+
 	return (
 		<div className="space-y-4">
 			<div className="flex justify-between items-center">
-				<h3 className="text-md font-medium">Parameters</h3>
-
-				<div className="space-x-2">
-					<Button
-						type="button"
-						size="sm"
-						variant="outline"
-						onClick={() => onAddParameter('path')}
-						disabled={isSubmittingForm}
-					>
-						Path
-					</Button>
-					<Button
-						type="button"
-						size="sm"
-						variant="outline"
-						onClick={() => onAddParameter('query')}
-						disabled={isSubmittingForm}
-					>
-						Query
-					</Button>
-					<Button
-						type="button"
-						size="sm"
-						variant="outline"
-						onClick={() => onAddParameter('header')}
-						disabled={isSubmittingForm}
-					>
-						Header
-					</Button>
-				</div>
+				<h3 className="text-md font-medium capitalize">{paramType} Parameters</h3>
+				<Button
+					type="button"
+					size="sm"
+					variant="outline"
+					onClick={addParameter}
+					disabled={isSubmitting}
+				>
+					Add {paramType} Param
+				</Button>
 			</div>
 
-			{parameters.length > 0 ? (
+			{filteredFields.length > 0 ? (
 				<Table>
 					<TableHeader>
 						<TableRow>
 							<TableHead>Name</TableHead>
-							<TableHead>In</TableHead>
-							<TableHead>Req.</TableHead>
+							<TableHead>Required</TableHead>
 							<TableHead>Description</TableHead>
 							<TableHead className="w-[50px]"></TableHead>
 						</TableRow>
 					</TableHeader>
-
 					<TableBody>
-						{parameters.map((param) => (
-							<TableRow key={param._id}>
+						{filteredFields.map((field) => (
+							<TableRow key={field.id}>
 								<TableCell>
-									<Input
-										value={param.name}
-										onChange={(e) =>
-											onUpdateParameter(param._id, 'name', e.target.value)
-										}
-										disabled={isSubmittingForm}
+									<FormField
+										control={control}
+										name={`parameters.${field.originalIndex}.name`}
+										render={({ field }) => (
+											<FormItem>
+												<FormControl>
+													<Input {...field} disabled={isSubmitting} />
+												</FormControl>
+												<FormMessage />
+											</FormItem>
+										)}
 									/>
 								</TableCell>
-
 								<TableCell>
-									<Select
-										value={param.in}
-										onValueChange={(val) =>
-											onUpdateParameter(
-												param._id,
-												'in',
-												val as 'path' | 'query' | 'header',
-											)
-										}
-										disabled={isSubmittingForm}
-									>
-										<SelectTrigger>
-											<SelectValue />
-										</SelectTrigger>
-
-										<SelectContent>
-											<SelectItem value="path">path</SelectItem>
-											<SelectItem value="query">query</SelectItem>
-											<SelectItem value="header">header</SelectItem>
-										</SelectContent>
-									</Select>
-								</TableCell>
-
-								<TableCell>
-									<Switch
-										checked={param.required || false}
-										onCheckedChange={(val) =>
-											onUpdateParameter(param._id, 'required', val)
-										}
-										disabled={param.in === 'path' || isSubmittingForm}
+									<FormField
+										control={control}
+										name={`parameters.${field.originalIndex}.required`}
+										render={({ field }) => (
+											<FormItem>
+												<FormControl>
+													<Switch
+														checked={field.value}
+														onCheckedChange={field.onChange}
+														disabled={
+															paramType === 'path' || isSubmitting
+														}
+													/>
+												</FormControl>
+											</FormItem>
+										)}
 									/>
 								</TableCell>
-
 								<TableCell>
-									<Input
-										value={param.description || ''}
-										onChange={(e) =>
-											onUpdateParameter(
-												param._id,
-												'description',
-												e.target.value,
-											)
-										}
-										disabled={isSubmittingForm}
+									<FormField
+										control={control}
+										name={`parameters.${field.originalIndex}.description`}
+										render={({ field }) => (
+											<FormItem>
+												<FormControl>
+													<Input {...field} disabled={isSubmitting} />
+												</FormControl>
+												<FormMessage />
+											</FormItem>
+										)}
 									/>
 								</TableCell>
-
 								<TableCell>
 									<Button
 										type="button"
 										variant="ghost"
 										size="icon"
-										onClick={() => onRemoveParameter(param._id)}
-										disabled={isSubmittingForm}
+										onClick={() => remove(field.originalIndex)}
+										disabled={isSubmitting}
 									>
 										<Trash className="h-4 w-4" />
 									</Button>
@@ -168,7 +132,9 @@ const FormParametersSection: React.FC<FormParametersSectionProps> = ({
 					</TableBody>
 				</Table>
 			) : (
-				<p className="text-center text-muted-foreground py-4">No parameters defined.</p>
+				<p className="text-center text-muted-foreground py-4">
+					No {paramType} parameters defined.
+				</p>
 			)}
 		</div>
 	);

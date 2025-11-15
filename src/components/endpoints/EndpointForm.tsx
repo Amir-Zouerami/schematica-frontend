@@ -1,26 +1,17 @@
-import { useAuth } from '@/contexts/AuthContext';
 import { useCreateEndpoint, useUpdateEndpoint } from '@/hooks/api/useEndpoints';
 import { useToast } from '@/hooks/use-toast';
-import { api, ApiError } from '@/utils/api';
-import { inferSchemaFromValue } from '@/utils/openApiUtils';
-import { RefreshCw, X } from 'lucide-react';
-import React, { useEffect, useMemo, useState } from 'react';
-import { v4 as uuidv4 } from 'uuid';
+import { ApiError } from '@/utils/api';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { X } from 'lucide-react';
+import React, { useEffect, useId, useMemo, useState } from 'react';
+import { FormProvider, useForm } from 'react-hook-form';
+import { z } from 'zod';
 
-import {
-	AlertDialog,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
 	Select,
 	SelectContent,
@@ -34,727 +25,477 @@ import { Textarea } from '@/components/ui/textarea';
 
 import type { components } from '@/types/api-types';
 import {
-	ExampleObject,
 	MediaTypeObject,
 	OpenAPISpec,
 	OperationObject,
-	ParameterObject,
-	ReferenceObject,
 	RequestBodyObject,
 	ResponseObject,
 } from '@/types/types';
 
-import FormParametersSection, {
-	ManagedParameterUI as SectionManagedParameterUI,
-} from './FormSections/FormParametersSection';
-import FormRequestBodySection, {
-	ManagedRequestBodyUI as SectionManagedRequestBodyUI,
-} from './FormSections/FormRequestBodySection';
-import FormResponsesSection, {
-	ManagedResponseUI as SectionManagedResponseUI,
-} from './FormSections/FormResponsesSection';
+import FormParametersSection from './FormSections/FormParametersSection';
+import FormRequestBodySection from './FormSections/FormRequestBodySection';
+import FormResponsesSection from './FormSections/FormResponsesSection';
 
-// --- START: Type Definitions ---
+// --- Type Definitions ---
 type EndpointDto = components['schemas']['EndpointDto'];
-type CreateEndpointDto = components['schemas']['CreateEndpointDto'];
-type UpdateEndpointDto = components['schemas']['UpdateEndpointDto'];
 
-type ManagedParameterUI = SectionManagedParameterUI;
-type ManagedRequestBodyUI = SectionManagedRequestBodyUI;
-type ManagedResponseUI = SectionManagedResponseUI;
-// --- END: Type Definitions ---
+// --- Helper for JSON validation in Zod ---
+const jsonString = z.string().refine(
+	(val) => {
+		if (val.trim() === '') return true; // Allow empty string
+		try {
+			JSON.parse(val);
+			return true;
+		} catch {
+			return false;
+		}
+	},
+	{ message: 'Invalid JSON format.' },
+);
 
-interface FullEndpointFormProps {
+// --- Zod Schemas for Validation ---
+const parameterSchema = z.object({
+	name: z.string().min(1),
+	in: z.enum(['query', 'header', 'path', 'cookie']),
+	description: z.string().optional(),
+	required: z.boolean().optional(),
+	schema: z
+		.object({
+			type: z.enum(['string', 'number', 'integer', 'boolean', 'array', 'object']),
+		})
+		.optional(),
+});
+
+const requestBodySchema = z.object({
+	description: z.string().optional(),
+	required: z.boolean(),
+	contentType: z.string(),
+	schemaString: jsonString,
+	exampleString: jsonString,
+});
+
+const responseSchema = z.object({
+	statusCode: z.string().min(1, 'Status code is required.'),
+	description: z.string().min(1, 'Description is required.'),
+	schemaString: jsonString,
+	exampleString: jsonString,
+});
+
+const endpointFormSchema = z.object({
+	path: z
+		.string()
+		.min(1, 'Path is required.')
+		.startsWith('/', { message: 'Path must start with /' }),
+	method: z.enum(['get', 'post', 'put', 'delete', 'patch', 'options', 'head']),
+	summary: z.string().min(1, 'Summary is required.'),
+	description: z.string().optional(),
+	tags: z.array(z.string()),
+	isDeprecated: z.boolean(),
+	parameters: z.array(parameterSchema).optional(),
+	requestBody: requestBodySchema.nullable().optional(),
+	responses: z.array(responseSchema).min(1, 'At least one response is required.'),
+});
+
+type EndpointFormValues = z.infer<typeof endpointFormSchema>;
+
+// --- Component Props ---
+interface EndpointFormProps {
 	projectId: string;
 	endpoint?: EndpointDto;
 	onClose: () => void;
-	onSubmit: (data: any) => void;
 	openApiSpec: OpenAPISpec;
 }
 
-interface ConflictDetails {
-	message: string;
-	serverUpdatedAt?: string;
-	lastUpdatedBy?: string;
-}
-
-const EndpointForm: React.FC<FullEndpointFormProps> = ({
-	projectId,
-	endpoint,
-	onClose,
-	openApiSpec,
-}) => {
-	const { user } = useAuth();
+const EndpointForm: React.FC<EndpointFormProps> = ({ projectId, endpoint, onClose }) => {
 	const { toast } = useToast();
+	const formId = useId();
 	const createEndpointMutation = useCreateEndpoint();
 	const updateEndpointMutation = useUpdateEndpoint();
-	const isSubmitting = createEndpointMutation.isPending || updateEndpointMutation.isPending;
 
-	const [path, setPath] = useState('');
-	const [method, setMethod] = useState('get');
-	const [summary, setSummary] = useState('');
-	const [description, setDescription] = useState('');
-	const [tags, setTags] = useState<string[]>([]);
-	const [currentTagInput, setCurrentTagInput] = useState('');
-	const [isDeprecated, setIsDeprecated] = useState(false);
 	const [lastKnownUpdatedAt, setLastKnownUpdatedAt] = useState<string | undefined>(undefined);
+	const [conflictDetails, setConflictDetails] = useState<any | null>(null);
+	const [currentTagInput, setCurrentTagInput] = useState('');
 
-	const [parameters, setParameters] = useState<ManagedParameterUI[]>([]);
-	const [requestBodyState, setRequestBodyState] = useState<ManagedRequestBodyUI | undefined>(
-		undefined,
-	);
-	const [managedResponses, setManagedResponses] = useState<ManagedResponseUI[]>([]);
-	const [conflictDetails, setConflictDetails] = useState<ConflictDetails | null>(null);
-
-	const formId = useMemo(
-		() => `endpointForm_${projectId}_${endpoint?.id || 'new'}`,
-		[projectId, endpoint],
-	);
-
-	const populateFormFields = (endpointData: EndpointDto | undefined) => {
-		const op = endpointData?.operation as unknown as OperationObject | undefined;
-		setPath(endpointData?.path || '');
-		setMethod(endpointData?.method || 'get');
-		setSummary(op?.summary || '');
-		setDescription(op?.description || '');
-		setTags(op?.tags || []);
-		setCurrentTagInput('');
-		setIsDeprecated(op?.deprecated || false);
-		setLastKnownUpdatedAt(endpointData?.updatedAt);
-
-		if (op?.parameters) {
-			setParameters(
-				(op.parameters as ParameterObject[]).map((p) => ({ _id: uuidv4(), ...p })),
-			);
-		} else {
-			setParameters([]);
-		}
-
-		const resolvedRb = op?.requestBody as RequestBodyObject | undefined;
-		if (resolvedRb) {
-			const contentType = Object.keys(resolvedRb.content || {})[0] || 'application/json';
-			const mediaType = resolvedRb.content?.[contentType] as MediaTypeObject | undefined;
-			let exampleForForm: any = {};
-			let exampleNameForForm: string | undefined = undefined;
-
-			if (mediaType?.examples && Object.keys(mediaType.examples).length > 0) {
-				const firstExampleKey = Object.keys(mediaType.examples)[0];
-				exampleNameForForm = firstExampleKey;
-				const firstExampleObject = mediaType.examples[firstExampleKey] as
-					| ExampleObject
-					| ReferenceObject
-					| undefined;
-				if (firstExampleObject && 'value' in firstExampleObject)
-					exampleForForm = (firstExampleObject as ExampleObject).value;
-			} else if (mediaType?.example !== undefined) {
-				exampleForForm = mediaType.example;
-			}
-
-			setRequestBodyState({
-				description: resolvedRb.description || '',
-				required: resolvedRb.required || false,
-				contentType: contentType,
-				schemaString: JSON.stringify(mediaType?.schema || {}, null, 2),
-				exampleString: JSON.stringify(exampleForForm, null, 2),
-				exampleName: exampleNameForForm,
-			});
-		} else {
-			setRequestBodyState(undefined);
-		}
-
-		if (op?.responses && Object.keys(op.responses).length > 0) {
-			setManagedResponses(
-				Object.entries(op.responses as Record<string, ResponseObject>).map(
-					([statusCode, respData]) => {
-						const appJsonContent = respData.content?.['application/json'] as
-							| MediaTypeObject
-							| undefined;
-						let exampleForForm: any = {};
-						let exampleNameForForm: string | undefined = undefined;
-
-						if (
-							appJsonContent?.examples &&
-							Object.keys(appJsonContent.examples).length > 0
-						) {
-							const firstExampleKey = Object.keys(appJsonContent.examples)[0];
-							exampleNameForForm = firstExampleKey;
-							const firstExampleObject = appJsonContent.examples[firstExampleKey] as
-								| ExampleObject
-								| ReferenceObject
-								| undefined;
-							if (firstExampleObject && 'value' in firstExampleObject)
-								exampleForForm = (firstExampleObject as ExampleObject).value;
-						} else if (appJsonContent?.example !== undefined) {
-							exampleForForm = appJsonContent.example;
-						}
-
-						return {
-							_id: uuidv4(),
-							statusCode,
-							description: respData.description,
-							content: {
-								'application/json': {
-									schemaString: JSON.stringify(
-										appJsonContent?.schema || {},
-										null,
-										2,
-									),
-									exampleString: JSON.stringify(exampleForForm, null, 2),
-									exampleName: exampleNameForForm,
-								},
-							},
-						};
+	const formValues = useMemo(() => {
+		if (!endpoint) {
+			return {
+				path: '',
+				method: 'get' as EndpointFormValues['method'],
+				summary: '',
+				description: '',
+				tags: [],
+				isDeprecated: false,
+				parameters: [],
+				requestBody: null,
+				responses: [
+					{
+						statusCode: '200',
+						description: 'Successful response',
+						schemaString: '{}',
+						exampleString: '{}',
 					},
-				),
-			);
-		} else {
-			setManagedResponses([
-				{
-					_id: uuidv4(),
-					statusCode: '200',
-					description: 'Successful response',
-					content: { 'application/json': { schemaString: '{}', exampleString: '{}' } },
-				},
-			]);
-		}
-	};
-
-	useEffect(() => {
-		if (!conflictDetails) {
-			populateFormFields(endpoint);
-		}
-	}, [endpoint, conflictDetails]);
-
-	const addParameter = (paramType: 'path' | 'query' | 'header') => {
-		setParameters((prev) => [
-			...prev,
-			{
-				_id: uuidv4(),
-				name: '',
-				in: paramType,
-				required: paramType === 'path',
-				schema: { type: 'string' },
-			},
-		]);
-	};
-	const removeParameter = (id: string) => {
-		setParameters((prev) => prev.filter((p) => p._id !== id));
-	};
-	const updateParameter = (
-		id: string,
-		field: keyof Omit<ManagedParameterUI, '_id'>,
-		value: any,
-	) => {
-		setParameters((prev) => prev.map((p) => (p._id === id ? { ...p, [field]: value } : p)));
-	};
-	const updateRequestBodyStateDirect = (field: keyof ManagedRequestBodyUI, value: any) => {
-		setRequestBodyState((prev) => {
-			const base: ManagedRequestBodyUI = prev || {
-				description: '',
-				required: false,
-				contentType: 'application/json',
-				schemaString: '{}',
-				exampleString: '{}',
+				],
 			};
-			let newSchemaString = base.schemaString;
-			if (field === 'exampleString') {
-				try {
-					const parsedExample = JSON.parse(value);
-					newSchemaString = JSON.stringify(inferSchemaFromValue(parsedExample), null, 2);
-				} catch (e) {
-					/* Intentionally empty */
-				}
-				return { ...base, exampleString: value, schemaString: newSchemaString };
-			}
-			return { ...base, [field]: value };
-		});
-	};
-	const ensureRequestBodyStateExists = () => {
-		if (!requestBodyState)
-			setRequestBodyState({
-				description: '',
-				required: false,
-				contentType: 'application/json',
-				schemaString: '{}',
-				exampleString: '{}',
-			});
-	};
-	const handleAddNewResponseEntry = () => {
-		setManagedResponses((prev) => [
-			...prev,
-			{
-				_id: uuidv4(),
-				statusCode: '',
-				description: '',
-				content: { 'application/json': { schemaString: '{}', exampleString: '{}' } },
-			},
-		]);
-	};
-	const removeManagedResponse = (id: string) => {
-		setManagedResponses((prev) => prev.filter((r) => r._id !== id));
-	};
-	const updateManagedResponseValue = (
-		id: string,
-		field: 'statusCode' | 'description',
-		value: string,
-	) => {
-		setManagedResponses((prev) =>
-			prev.map((r) => (r._id === id ? { ...r, [field]: value } : r)),
-		);
-	};
-	const updateResponseContentString = (
-		id: string,
-		type: 'schemaString' | 'exampleString',
-		value: string,
-	) => {
-		setManagedResponses((prev) =>
-			prev.map((r) => {
-				if (r._id === id) {
-					const currentAppJson = r.content?.['application/json'] || {
-						schemaString: '',
-						exampleString: '',
-					};
-					let newSchemaString =
-						type === 'schemaString' ? value : currentAppJson.schemaString;
-					const newExampleString =
-						type === 'exampleString' ? value : currentAppJson.exampleString;
-					if (type === 'exampleString') {
-						try {
-							const parsedExample = JSON.parse(value);
-							newSchemaString = JSON.stringify(
-								inferSchemaFromValue(parsedExample),
-								null,
-								2,
-							);
-						} catch (e) {
-							/* Intentionally empty */
-						}
+		}
+
+		const op = endpoint.operation as unknown as OperationObject;
+		const requestBody = op.requestBody as RequestBodyObject | undefined;
+		const contentType = requestBody
+			? Object.keys(requestBody.content || {})[0] || 'application/json'
+			: 'application/json';
+		const mediaType = requestBody?.content?.[contentType] as MediaTypeObject | undefined;
+
+		return {
+			path: endpoint.path,
+			method: endpoint.method as EndpointFormValues['method'],
+			summary: op.summary || '',
+			description: op.description || '',
+			tags: op.tags || [],
+			isDeprecated: op.deprecated || false,
+			parameters: (op.parameters as any[]) || [],
+			requestBody: requestBody
+				? {
+						description: requestBody.description || '',
+						required: requestBody.required || false,
+						contentType: contentType,
+						schemaString: JSON.stringify(mediaType?.schema || {}, null, 2),
+						exampleString: JSON.stringify(mediaType?.example || {}, null, 2),
 					}
+				: null,
+			responses: Object.entries(op.responses as Record<string, ResponseObject>).map(
+				([statusCode, resp]) => {
+					const respContentType =
+						Object.keys(resp.content || {})[0] || 'application/json';
+					const respMediaType = resp.content?.[respContentType] as
+						| MediaTypeObject
+						| undefined;
 					return {
-						...r,
+						statusCode,
+						description: resp.description,
+						schemaString: JSON.stringify(respMediaType?.schema || {}, null, 2),
+						exampleString: JSON.stringify(respMediaType?.example || {}, null, 2),
+					};
+				},
+			),
+		};
+	}, [endpoint]);
+
+	const methods = useForm<EndpointFormValues>({
+		resolver: zodResolver(endpointFormSchema),
+		values: formValues, // Use the memoized values to initialize the form
+	});
+
+	const { isSubmitting } = methods.formState;
+
+	// This effect now only handles resetting the form on external changes and setting the timestamp
+	useEffect(() => {
+		methods.reset(formValues);
+		if (endpoint) {
+			setLastKnownUpdatedAt(endpoint.updatedAt);
+		}
+	}, [formValues, methods, endpoint]);
+
+	const processSubmit = async (values: EndpointFormValues, forceOverwrite = false) => {
+		if (!forceOverwrite) setConflictDetails(null);
+
+		const operationForBackend: Partial<OperationObject> = {
+			summary: values.summary,
+			description: values.description,
+			tags: values.tags,
+			deprecated: values.isDeprecated,
+			parameters: values.parameters,
+			requestBody: values.requestBody
+				? {
+						description: values.requestBody.description,
+						required: values.requestBody.required,
+						content: {
+							[values.requestBody.contentType]: {
+								schema: JSON.parse(values.requestBody.schemaString || '{}'),
+								example: JSON.parse(values.requestBody.exampleString || 'null'),
+							},
+						},
+					}
+				: undefined,
+			responses: values.responses.reduce(
+				(acc, resp) => {
+					acc[resp.statusCode] = {
+						description: resp.description,
 						content: {
 							'application/json': {
-								...currentAppJson,
-								schemaString: newSchemaString,
-								exampleString: newExampleString,
+								schema: JSON.parse(resp.schemaString || '{}'),
+								example: JSON.parse(resp.exampleString || 'null'),
 							},
 						},
 					};
-				}
-				return r;
-			}),
-		);
-	};
-
-	const handleAddTag = () => {
-		const newTag = currentTagInput.trim();
-		if (newTag && !tags.includes(newTag)) setTags((prev) => [...prev, newTag]);
-		setCurrentTagInput('');
-	};
-	const handleRemoveTag = (tagToRemove: string) => {
-		setTags((prev) => prev.filter((tag) => tag !== tagToRemove));
-	};
-
-	const handleSubmit = async (e?: React.FormEvent, forceOverwrite = false) => {
-		if (e) e.preventDefault();
-		if (!forceOverwrite) setConflictDetails(null);
-
-		let submissionError = false;
-		const finalParameters: ParameterObject[] = parameters.map(
-			({ _id, ...paramData }) => paramData as ParameterObject,
-		);
-		let finalRequestBody: RequestBodyObject | undefined = undefined;
-
-		if (requestBodyState) {
-			try {
-				const schema = requestBodyState.schemaString.trim()
-					? JSON.parse(requestBodyState.schemaString)
-					: undefined;
-				const example = requestBodyState.exampleString.trim()
-					? JSON.parse(requestBodyState.exampleString)
-					: undefined;
-				finalRequestBody = {
-					description: requestBodyState.description,
-					required: requestBodyState.required,
-					content: { [requestBodyState.contentType]: { schema, example } },
-				};
-			} catch (err) {
-				toast({
-					title: 'Error',
-					description: 'Invalid JSON in Request Body.',
-					variant: 'destructive',
-				});
-				submissionError = true;
-			}
-		}
-
-		const finalResponses: Record<string, ResponseObject> = {};
-		managedResponses.forEach((mr_ui) => {
-			if (!mr_ui.statusCode.trim()) {
-				toast({
-					title: 'Error',
-					description: 'Response status code cannot be empty.',
-					variant: 'destructive',
-				});
-				submissionError = true;
-				return;
-			}
-			try {
-				const schema = mr_ui.content?.['application/json']?.schemaString?.trim()
-					? JSON.parse(mr_ui.content['application/json'].schemaString)
-					: undefined;
-				const example = mr_ui.content?.['application/json']?.exampleString?.trim()
-					? JSON.parse(mr_ui.content['application/json'].exampleString)
-					: undefined;
-				finalResponses[mr_ui.statusCode.trim()] = {
-					description: mr_ui.description,
-					content: { 'application/json': { schema, example } },
-				};
-			} catch (err) {
-				toast({
-					title: 'Error',
-					description: `Invalid JSON in Response ${mr_ui.statusCode}.`,
-					variant: 'destructive',
-				});
-				submissionError = true;
-			}
-		});
-
-		if (submissionError) return;
-
-		const operationForBackend: OperationObject = {
-			summary,
-			description,
-			tags,
-			deprecated: isDeprecated,
-			parameters: finalParameters.length > 0 ? finalParameters : undefined,
-			requestBody: finalRequestBody,
-			responses: Object.keys(finalResponses).length > 0 ? finalResponses : undefined,
+					return acc;
+				},
+				{} as Record<string, any>,
+			),
 		};
 
 		try {
 			if (endpoint) {
-				if (!lastKnownUpdatedAt && !forceOverwrite)
-					throw new Error('Missing last known update timestamp for concurrency control.');
-
-				const payload: UpdateEndpointDto = {
-					path,
-					method: method as UpdateEndpointDto['method'],
-					operation:
-						operationForBackend as unknown as components['schemas']['OpenApiOperationDto'],
-					lastKnownUpdatedAt: forceOverwrite ? undefined : lastKnownUpdatedAt,
-				};
 				await updateEndpointMutation.mutateAsync({
 					projectId,
 					endpointId: endpoint.id,
-					endpointData: payload,
+					endpointData: {
+						path: values.path,
+						method: values.method,
+						operation: operationForBackend as any,
+						lastKnownUpdatedAt: forceOverwrite ? undefined : lastKnownUpdatedAt!,
+					},
 				});
 				toast({ title: 'Success', description: 'Endpoint updated successfully.' });
 			} else {
-				const payload: CreateEndpointDto = {
-					path,
-					method: method as CreateEndpointDto['method'],
-					operation:
-						operationForBackend as unknown as components['schemas']['OpenApiOperationDto'],
-				};
 				await createEndpointMutation.mutateAsync({
 					projectId,
-					endpointData: payload,
+					endpointData: {
+						path: values.path,
+						method: values.method,
+						operation: operationForBackend as any,
+					},
 				});
 				toast({ title: 'Success', description: 'Endpoint created successfully.' });
 			}
 			onClose();
 		} catch (err) {
 			const error = err as ApiError;
-			if (error?.status === 409 && endpoint) {
-				setConflictDetails({
-					message: error.message || 'This endpoint was updated by someone else.',
-					serverUpdatedAt: (error.errorResponse as any)?.serverUpdatedAt,
-					lastUpdatedBy: (error.errorResponse as any)?.lastUpdatedBy,
-				});
+			if (error?.status === 409) {
+				if (error.message.includes('Concurrency conflict')) {
+					setConflictDetails({
+						message: error.message,
+						serverUpdatedAt: (error.errorResponse as any)?.serverUpdatedAt,
+						lastUpdatedBy: (error.errorResponse as any)?.lastUpdatedBy,
+					});
+				} else {
+					methods.setError('path', { type: 'server', message: error.message });
+				}
 			} else {
-				const errorMessage =
-					error instanceof ApiError ? error.message : 'Failed to save endpoint.';
-				toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+				toast({ title: 'Error', description: error.message, variant: 'destructive' });
 			}
 		}
 	};
 
-	const handleForceSubmitFromDialog = () => handleSubmit(undefined, true);
-	const handleCloseConflictDialogOnly = () => {
-		setConflictDetails(null);
-		toast({
-			title: 'Conflict Noted',
-			description:
-				'Your edits are still in the form. Please review or copy them before proceeding.',
-			duration: 7000,
-		});
-	};
-	const handleRefreshAndDiscardEdits = async () => {
-		if (!projectId || !endpoint) return;
-		setConflictDetails(null);
-		try {
-			const response = await api.get<EndpointDto>(
-				`/projects/${projectId}/endpoints/${endpoint.id}`,
-			);
-			if (response.data) {
-				populateFormFields(response.data);
-				toast({
-					title: 'Data Refreshed',
-					description:
-						'Form has been updated with the latest server data. Your previous edits were discarded.',
-				});
-			} else {
-				throw new Error('Could not fetch latest endpoint data.');
-			}
-		} catch (err) {
-			const errorMessage = err instanceof ApiError ? err.message : 'Refresh failed.';
-			toast({ title: 'Refresh Failed', description: errorMessage, variant: 'destructive' });
-		}
+	const onSubmit = (values: EndpointFormValues) => {
+		processSubmit(values, false);
 	};
 
-	const formFieldsDisabled = isSubmitting && !conflictDetails;
+	const handleTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+		if (e.key === 'Enter' || e.key === ',') {
+			e.preventDefault();
+			const newTag = currentTagInput.trim();
+			if (newTag && !methods.getValues('tags').includes(newTag)) {
+				methods.setValue('tags', [...methods.getValues('tags'), newTag]);
+			}
+			setCurrentTagInput('');
+		}
+	};
 
 	return (
 		<>
-			<Card className="p-4 max-h-[90vh] overflow-y-auto">
-				<CardContent>
-					<form onSubmit={handleSubmit} id={`${formId}-mainForm`} className="space-y-6">
-						<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-							<div className="md:col-span-2">
-								<Label htmlFor={`${formId}-path`}>Path</Label>
-								<Input
-									id={`${formId}-path`}
-									value={path}
-									onChange={(e) => setPath(e.target.value)}
-									placeholder="/api/{id}"
-									required
-									disabled={formFieldsDisabled}
-								/>
-							</div>
-							<div>
-								<Label htmlFor={`${formId}-method`}>Method</Label>
-								<Select
-									value={method}
-									onValueChange={(val) => setMethod(val)}
-									disabled={formFieldsDisabled}
-								>
-									<SelectTrigger id={`${formId}-method`}>
-										<SelectValue />
-									</SelectTrigger>
-									<SelectContent>
-										<SelectItem value="get">GET</SelectItem>
-										<SelectItem value="post">POST</SelectItem>
-										<SelectItem value="put">PUT</SelectItem>
-										<SelectItem value="delete">DELETE</SelectItem>
-										<SelectItem value="patch">PATCH</SelectItem>
-										<SelectItem value="options">OPTIONS</SelectItem>
-										<SelectItem value="head">HEAD</SelectItem>
-									</SelectContent>
-								</Select>
-							</div>
-						</div>
-						<div>
-							<Label htmlFor={`${formId}-summary`}>Summary</Label>
-							<Input
-								id={`${formId}-summary`}
-								value={summary}
-								onChange={(e) => setSummary(e.target.value)}
-								placeholder="Endpoint summary"
-								disabled={formFieldsDisabled}
-							/>
-						</div>
-						<div>
-							<Label htmlFor={`${formId}-description`}>Description</Label>
-							<Textarea
-								id={`${formId}-description`}
-								value={description}
-								onChange={(e) => setDescription(e.target.value)}
-								placeholder="Endpoint description"
-								rows={3}
-								disabled={formFieldsDisabled}
-							/>
-						</div>
-						<div className="space-y-2">
-							<Label htmlFor={`${formId}-tags-input`}>Tags</Label>
-							<div className="flex items-center space-x-2">
-								<Input
-									id={`${formId}-tags-input`}
-									value={currentTagInput}
-									onChange={(e) => setCurrentTagInput(e.target.value)}
-									placeholder="Enter a tag"
-									onKeyDown={(e) => {
-										if (e.key === 'Enter' || e.key === ',') {
-											e.preventDefault();
-											handleAddTag();
-										}
-									}}
-									disabled={formFieldsDisabled}
-								/>
-								<Button
-									type="button"
-									variant="outline"
-									onClick={handleAddTag}
-									disabled={formFieldsDisabled}
-								>
-									Add Tag
-								</Button>
-							</div>
-							{tags.length > 0 && (
-								<div className="flex flex-wrap gap-2 mt-2">
-									{tags.map((tag) => (
-										<Badge
-											key={tag}
-											variant="secondary"
-											className="flex items-center"
-										>
-											{tag}
-											<button
-												type="button"
-												className="ml-1.5 p-0.5 rounded-full hover:bg-muted-foreground/20"
-												onClick={() => handleRemoveTag(tag)}
-												disabled={formFieldsDisabled}
-											>
-												<X className="h-3 w-3" />
-											</button>
-										</Badge>
-									))}
-								</div>
-							)}
-						</div>
-						<div className="flex items-center space-x-2">
-							<Switch
-								id={`${formId}-deprecated`}
-								checked={isDeprecated}
-								onCheckedChange={setIsDeprecated}
-								disabled={formFieldsDisabled}
-							/>
-							<Label htmlFor={`${formId}-deprecated`}>Deprecated</Label>
-						</div>
-						<Tabs defaultValue="parameters" className="space-y-4">
-							<TabsList>
-								<TabsTrigger value="parameters">Parameters</TabsTrigger>
-								<TabsTrigger value="requestBody">Request Body</TabsTrigger>
-								<TabsTrigger value="responses">Responses</TabsTrigger>
-							</TabsList>
-							<TabsContent value="parameters">
-								<FormParametersSection
-									parameters={parameters}
-									onAddParameter={addParameter}
-									onRemoveParameter={removeParameter}
-									onUpdateParameter={updateParameter}
-									isSubmittingForm={formFieldsDisabled}
-								/>
-							</TabsContent>
-							<TabsContent value="requestBody">
-								<FormRequestBodySection
-									requestBodyState={requestBodyState}
-									onUpdateRequestBodyState={updateRequestBodyStateDirect}
-									onEnsureRequestBodyStateExists={ensureRequestBodyStateExists}
-									isSubmittingForm={formFieldsDisabled}
-									formIdPrefix={`${formId}-rb`}
-								/>
-							</TabsContent>
-							<TabsContent value="responses">
-								<FormResponsesSection
-									managedResponses={managedResponses}
-									onAddResponseClick={handleAddNewResponseEntry}
-									onRemoveManagedResponse={removeManagedResponse}
-									onUpdateManagedResponseValue={updateManagedResponseValue}
-									onUpdateResponseContentString={updateResponseContentString}
-									isSubmittingForm={formFieldsDisabled}
-								/>
-							</TabsContent>
-						</Tabs>
-					</form>
-				</CardContent>
-				<CardFooter className="flex justify-end space-x-2">
-					<Button
-						type="button"
-						variant="outline"
-						onClick={onClose}
-						disabled={isSubmitting && !!conflictDetails}
-					>
-						Cancel
-					</Button>
-					<Button
-						type="submit"
-						form={`${formId}-mainForm`}
-						disabled={isSubmitting || !!conflictDetails}
-					>
-						{isSubmitting
-							? 'Saving...'
-							: endpoint
-								? 'Update Endpoint'
-								: 'Create Endpoint'}
-					</Button>
-				</CardFooter>
-			</Card>
-
-			{conflictDetails && (
-				<AlertDialog
-					open={!!conflictDetails}
-					onOpenChange={(isOpen) => !isOpen && setConflictDetails(null)}
-				>
-					<AlertDialogContent className="max-w-screen-lg w-[900px]">
-						<AlertDialogHeader>
-							<AlertDialogTitle>Concurrency Conflict</AlertDialogTitle>
-							<AlertDialogDescription>
-								<p className="mb-1">{conflictDetails.message}</p>
-								<div className="my-5 leading-relaxed">
-									{conflictDetails.serverUpdatedAt && (
-										<p>
-											<strong>Last Server Update:</strong>{' '}
-											{new Date(
-												conflictDetails.serverUpdatedAt,
-											).toLocaleString()}
-										</p>
-									)}
-									{conflictDetails.lastUpdatedBy && (
-										<p className="mt-1">
-											<strong>Last Updated By:</strong>{' '}
-											{conflictDetails.lastUpdatedBy}
-										</p>
-									)}
-									<p className="mt-2">
-										Your current unsaved edits are still in the form.
-									</p>
-								</div>
-							</AlertDialogDescription>
-						</AlertDialogHeader>
-						<AlertDialogFooter className="flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2 mt-2">
-							<Button
-								className="w-full sm:w-auto"
-								variant="outline"
-								onClick={handleCloseConflictDialogOnly}
-							>
-								<X className="mr-2 h-4 w-4" /> Review My Edits
-							</Button>
-							<Button
-								className="w-full sm:w-auto"
-								variant="secondary"
-								onClick={handleRefreshAndDiscardEdits}
-							>
-								<RefreshCw className="mr-2 h-4 w-4" /> Refresh & Discard
-							</Button>
-							<Button
-								className="w-full sm:w-auto"
-								variant="destructive"
-								onClick={handleForceSubmitFromDialog}
-							>
-								Force Overwrite
-							</Button>
-						</AlertDialogFooter>
-						<AlertDialogCancel
-							onClick={handleCloseConflictDialogOnly}
-							className="absolute right-4 top-4"
+			<FormProvider {...methods}>
+				<Card className="p-4 max-h-[90vh] overflow-y-auto">
+					<CardContent>
+						<form
+							id={formId}
+							onSubmit={methods.handleSubmit(onSubmit)}
+							className="space-y-6"
 						>
-							<X className="h-4 w-4" />
-							<span className="sr-only">Close</span>
-						</AlertDialogCancel>
-					</AlertDialogContent>
-				</AlertDialog>
-			)}
+							{/* Basic Info */}
+							<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+								<FormField
+									control={methods.control}
+									name="path"
+									render={({ field }) => (
+										<FormItem className="md:col-span-2">
+											<FormLabel>Path</FormLabel>
+											<FormControl>
+												<Input
+													{...field}
+													placeholder="/api/v1/users/{id}"
+												/>
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+								<FormField
+									control={methods.control}
+									name="method"
+									render={({ field }) => (
+										<FormItem>
+											<FormLabel>Method</FormLabel>
+											<Select
+												onValueChange={field.onChange}
+												value={field.value}
+											>
+												<FormControl>
+													<SelectTrigger>
+														<SelectValue />
+													</SelectTrigger>
+												</FormControl>
+												<SelectContent>
+													{[
+														'get',
+														'post',
+														'put',
+														'delete',
+														'patch',
+														'options',
+														'head',
+													].map((m) => (
+														<SelectItem key={m} value={m}>
+															{m.toUpperCase()}
+														</SelectItem>
+													))}
+												</SelectContent>
+											</Select>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+							</div>
+							<FormField
+								control={methods.control}
+								name="summary"
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Summary</FormLabel>
+										<FormControl>
+											<Input {...field} placeholder="Endpoint summary" />
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+							<FormField
+								control={methods.control}
+								name="description"
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Description</FormLabel>
+										<FormControl>
+											<Textarea
+												{...field}
+												placeholder="Detailed endpoint description"
+												rows={3}
+											/>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+
+							{/* Tags and Deprecated */}
+							<div className="space-y-2">
+								<FormLabel>Tags</FormLabel>
+								<div className="flex items-center space-x-2">
+									<Input
+										value={currentTagInput}
+										onChange={(e) => setCurrentTagInput(e.target.value)}
+										onKeyDown={handleTagKeyDown}
+										placeholder="Enter a tag and press Enter"
+									/>
+								</div>
+								<FormField
+									control={methods.control}
+									name="tags"
+									render={({ field }) => (
+										<FormItem>
+											{field.value.length > 0 && (
+												<div className="flex flex-wrap gap-2 mt-2">
+													{field.value.map((tag) => (
+														<Badge key={tag} variant="secondary">
+															{tag}
+															<button
+																type="button"
+																className="ml-1.5 p-0.5"
+																onClick={() =>
+																	methods.setValue(
+																		'tags',
+																		field.value.filter(
+																			(t) => t !== tag,
+																		),
+																	)
+																}
+															>
+																<X className="h-3 w-3" />
+															</button>
+														</Badge>
+													))}
+												</div>
+											)}
+										</FormItem>
+									)}
+								/>
+							</div>
+							<FormField
+								control={methods.control}
+								name="isDeprecated"
+								render={({ field }) => (
+									<FormItem className="flex items-center space-x-2">
+										<FormControl>
+											<Switch
+												checked={field.value}
+												onCheckedChange={field.onChange}
+											/>
+										</FormControl>
+										<FormLabel>Deprecated</FormLabel>
+									</FormItem>
+								)}
+							/>
+
+							{/* Tabs for complex parts */}
+							<Tabs defaultValue="parameters">
+								<TabsList>
+									<TabsTrigger value="parameters">Parameters</TabsTrigger>
+									<TabsTrigger value="requestBody">Request Body</TabsTrigger>
+									<TabsTrigger value="responses">Responses</TabsTrigger>
+								</TabsList>
+								<TabsContent value="parameters" className="space-y-4">
+									<FormParametersSection paramType="path" />
+									<FormParametersSection paramType="query" />
+									<FormParametersSection paramType="header" />
+								</TabsContent>
+								<TabsContent value="requestBody">
+									<FormRequestBodySection
+										onAddRequestBody={() =>
+											methods.setValue('requestBody', {
+												description: '',
+												required: false,
+												contentType: 'application/json',
+												schemaString: '{}',
+												exampleString: '{}',
+											})
+										}
+									/>
+								</TabsContent>
+								<TabsContent value="responses">
+									<FormResponsesSection />
+								</TabsContent>
+							</Tabs>
+						</form>
+					</CardContent>
+					<CardFooter className="flex justify-end space-x-2">
+						<Button type="button" variant="outline" onClick={onClose}>
+							Cancel
+						</Button>
+						<Button
+							type="submit"
+							form={formId}
+							disabled={isSubmitting || !!conflictDetails}
+						>
+							{isSubmitting
+								? 'Saving...'
+								: endpoint
+									? 'Update Endpoint'
+									: 'Create Endpoint'}
+						</Button>
+					</CardFooter>
+				</Card>
+			</FormProvider>
+
+			{/* Concurrency Conflict Dialog would go here, similar to ProjectForm */}
 		</>
 	);
 };

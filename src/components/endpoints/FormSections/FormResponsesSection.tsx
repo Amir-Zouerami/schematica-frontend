@@ -1,142 +1,131 @@
-import React from 'react';
-import { Plus, X } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Plus, X } from 'lucide-react';
+import React from 'react';
+import { useFieldArray, useFormContext } from 'react-hook-form';
 
-export interface ManagedResponseUI {
-	_id: string;
-	statusCode: string;
-	description: string;
-	content?: {
-		'application/json'?: {
-			schemaString?: string;
-			exampleString?: string;
-			exampleName?: string;
-		};
+const FormResponsesSection: React.FC = () => {
+	const { control, formState } = useFormContext();
+	const { fields, append, remove } = useFieldArray({
+		control,
+		name: 'responses',
+	});
+
+	const { isSubmitting } = formState;
+
+	const addResponse = () => {
+		append({
+			statusCode: '',
+			description: '',
+			schemaString: '{}',
+			exampleString: '{}',
+		});
 	};
-}
 
-interface FormResponsesSectionProps {
-	managedResponses: ManagedResponseUI[];
-	onAddResponseClick: () => void;
-	onRemoveManagedResponse: (id: string) => void;
-	onUpdateManagedResponseValue: (
-		id: string,
-		field: 'statusCode' | 'description',
-		value: string,
-	) => void;
-	onUpdateResponseContentString: (
-		id: string,
-		type: 'schemaString' | 'exampleString',
-		value: string,
-	) => void;
-	isSubmittingForm: boolean;
-}
-
-const FormResponsesSection: React.FC<FormResponsesSectionProps> = ({
-	managedResponses,
-	onAddResponseClick,
-	onRemoveManagedResponse,
-	onUpdateManagedResponseValue,
-	onUpdateResponseContentString,
-	isSubmittingForm,
-}) => {
 	return (
 		<div className="space-y-4">
 			<div className="flex justify-between items-center">
 				<h3 className="text-md font-medium">Responses</h3>
-
 				<Button
 					type="button"
 					variant="outline"
 					size="sm"
-					onClick={onAddResponseClick}
-					disabled={isSubmittingForm}
+					onClick={addResponse}
+					disabled={isSubmitting}
 				>
-					<Plus className="h-4 w-4 mr-1" /> Add
+					<Plus className="h-4 w-4 mr-1" /> Add Response
 				</Button>
 			</div>
 
-			{managedResponses.length > 0 ? (
+			{fields.length > 0 ? (
 				<div className="space-y-8">
-					{managedResponses.map((managedResp) => (
+					{fields.map((field, index) => (
 						<div
-							key={managedResp._id}
-							className="p-4 border border-border rounded-lg space-y-4"
+							key={field.id}
+							className="p-4 border border-border rounded-lg space-y-4 relative"
 						>
-							<div className="flex justify-between items-center">
-								<div className="flex items-center space-x-2">
-									<Input
-										value={managedResp.statusCode}
-										onChange={(e) =>
-											onUpdateManagedResponseValue(
-												managedResp._id,
-												'statusCode',
-												e.target.value,
-											)
-										}
-										className="w-24 font-mono"
-										disabled={isSubmittingForm}
+							<div className="flex justify-between items-start">
+								<div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+									<FormField
+										control={control}
+										name={`responses.${index}.statusCode`}
+										render={({ field }) => (
+											<FormItem>
+												<FormLabel>Status Code</FormLabel>
+												<FormControl>
+													<Input
+														className="font-mono"
+														{...field}
+														disabled={isSubmitting}
+													/>
+												</FormControl>
+												<FormMessage />
+											</FormItem>
+										)}
 									/>
-									<Input
-										value={managedResp.description}
-										onChange={(e) =>
-											onUpdateManagedResponseValue(
-												managedResp._id,
-												'description',
-												e.target.value,
-											)
-										}
-										className="max-w-md"
-										disabled={isSubmittingForm}
+									<FormField
+										control={control}
+										name={`responses.${index}.description`}
+										render={({ field }) => (
+											<FormItem>
+												<FormLabel>Description</FormLabel>
+												<FormControl>
+													<Input {...field} disabled={isSubmitting} />
+												</FormControl>
+												<FormMessage />
+											</FormItem>
+										)}
 									/>
 								</div>
-
 								<Button
 									type="button"
 									variant="ghost"
 									size="sm"
-									onClick={() => onRemoveManagedResponse(managedResp._id)}
-									disabled={isSubmittingForm}
+									onClick={() => remove(index)}
+									disabled={isSubmitting}
+									className="absolute top-2 right-2"
 								>
 									<X className="h-4 w-4" />
 								</Button>
 							</div>
 
-							<Label>Schema (JSON)</Label>
-							<Textarea
-								value={
-									managedResp.content?.['application/json']?.schemaString || ''
-								}
-								onChange={(e) =>
-									onUpdateResponseContentString(
-										managedResp._id,
-										'schemaString',
-										e.target.value,
-									)
-								}
-								className="font-mono"
-								rows={6}
-								disabled={isSubmittingForm}
+							<FormField
+								control={control}
+								name={`responses.${index}.schemaString`}
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Schema (JSON)</FormLabel>
+										<FormControl>
+											<Textarea
+												className="font-mono"
+												rows={6}
+												{...field}
+												disabled={isSubmitting}
+											/>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
 							/>
-
-							<Label>Example (JSON)</Label>
-							<Textarea
-								value={
-									managedResp.content?.['application/json']?.exampleString || ''
-								}
-								onChange={(e) =>
-									onUpdateResponseContentString(
-										managedResp._id,
-										'exampleString',
-										e.target.value,
-									)
-								}
-								className="font-mono"
-								rows={6}
-								disabled={isSubmittingForm}
+							<FormField
+								control={control}
+								name={`responses.${index}.exampleString`}
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Example (JSON)</FormLabel>
+										<FormControl>
+											<Textarea
+												className="font-mono"
+												rows={6}
+												{...field}
+												disabled={isSubmitting}
+											/>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
 							/>
 						</div>
 					))}

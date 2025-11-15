@@ -1,14 +1,15 @@
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { useCreateNote, useDeleteNote, useNotes, useUpdateNote } from '@/hooks/api/useNotes';
 import { useProject } from '@/hooks/api/useProject';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
 import type { components } from '@/types/api-types';
+import { ApiError } from '@/utils/api';
 import { formatDate } from '@/utils/schemaUtils';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Edit, Trash2 } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
 
 import {
 	AlertDialog,
@@ -21,15 +22,24 @@ import {
 	AlertDialogTitle,
 	AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ApiError } from '@/utils/api';
+import { Textarea } from '@/components/ui/textarea';
 
 type NoteDto = components['schemas']['NoteDto'];
 
 interface NotesSectionProps {
-	projectId: string; // Keep for permissions check
+	projectId: string;
 	endpointId: string;
 }
+
+// Zod schemas for validation
+const noteSchema = z.object({
+	content: z.string().min(1, { message: 'Note content cannot be empty.' }),
+});
+type NoteFormValues = z.infer<typeof noteSchema>;
 
 const NotesSection: React.FC<NotesSectionProps> = ({ projectId, endpointId }) => {
 	const { user, isProjectOwner } = usePermissions();
@@ -38,32 +48,46 @@ const NotesSection: React.FC<NotesSectionProps> = ({ projectId, endpointId }) =>
 
 	const { data: notes, isLoading, error } = useNotes(endpointId);
 
-	const [newNoteContent, setNewNoteContent] = useState('');
 	const [noteToDelete, setNoteToDelete] = useState<NoteDto | null>(null);
 	const [editingNote, setEditingNote] = useState<NoteDto | null>(null);
-	const [editingContent, setEditingContent] = useState('');
 
 	const createNoteMutation = useCreateNote();
 	const deleteNoteMutation = useDeleteNote();
 	const updateNoteMutation = useUpdateNote();
 
+	// Form for adding a new note
+	const addNoteForm = useForm<NoteFormValues>({
+		resolver: zodResolver(noteSchema),
+		defaultValues: { content: '' },
+	});
+
+	// Form for editing an existing note
+	const editNoteForm = useForm<NoteFormValues>({
+		resolver: zodResolver(noteSchema),
+	});
+
+	// When editingNote changes, reset the edit form with the new content
+	useEffect(() => {
+		if (editingNote) {
+			editNoteForm.reset({ content: editingNote.content });
+		}
+	}, [editingNote, editNoteForm]);
+
 	const handleEditClick = (note: NoteDto) => {
 		setEditingNote(note);
-		setEditingContent(note.content);
 	};
 
 	const handleCancelEdit = () => {
 		setEditingNote(null);
-		setEditingContent('');
 	};
 
-	const handleSaveEdit = async () => {
-		if (!editingNote || !editingContent.trim()) return;
+	const onSaveEdit = async (values: NoteFormValues) => {
+		if (!editingNote) return;
 
 		try {
 			await updateNoteMutation.mutateAsync({
 				noteId: editingNote.id,
-				noteData: { content: editingContent.trim() },
+				noteData: { content: values.content.trim() },
 			});
 			toast({
 				title: 'Note Updated',
@@ -79,28 +103,14 @@ const NotesSection: React.FC<NotesSectionProps> = ({ projectId, endpointId }) =>
 		}
 	};
 
-	const handleAddNote = async () => {
-		if (!newNoteContent.trim()) {
-			toast({
-				title: 'Validation Error',
-				description: 'Please enter note content',
-				variant: 'destructive',
-			});
-			return;
-		}
-
+	const onAddNote = async (values: NoteFormValues) => {
 		try {
 			await createNoteMutation.mutateAsync({
 				endpointId,
-				noteData: { content: newNoteContent.trim() },
+				noteData: { content: values.content.trim() },
 			});
-
-			toast({
-				title: 'Note Added',
-				description: 'Your note has been added successfully',
-			});
-
-			setNewNoteContent('');
+			toast({ title: 'Note Added', description: 'Your note has been added successfully' });
+			addNoteForm.reset();
 		} catch (error) {
 			toast({
 				title: 'Error',
@@ -112,12 +122,8 @@ const NotesSection: React.FC<NotesSectionProps> = ({ projectId, endpointId }) =>
 
 	const confirmDeleteNote = async () => {
 		if (!noteToDelete) return;
-
 		try {
-			await deleteNoteMutation.mutateAsync({
-				noteId: noteToDelete.id,
-			});
-
+			await deleteNoteMutation.mutateAsync({ noteId: noteToDelete.id });
 			toast({
 				title: 'Note Deleted',
 				description: 'The note has been deleted successfully.',
@@ -158,26 +164,49 @@ const NotesSection: React.FC<NotesSectionProps> = ({ projectId, endpointId }) =>
 				<div className="space-y-4">
 					{notes.map((note) =>
 						editingNote?.id === note.id ? (
-							<div key={note.id} className="bg-secondary/20 rounded-lg p-4 border">
-								<Textarea
-									value={editingContent}
-									onChange={(e) => setEditingContent(e.target.value)}
-									className="min-h-[100px] mb-2"
-								/>
-								<div className="flex justify-end gap-2">
-									<Button variant="outline" size="sm" onClick={handleCancelEdit}>
-										Cancel
-									</Button>
-									<Button
-										size="sm"
-										onClick={handleSaveEdit}
-										disabled={updateNoteMutation.isPending}
-									>
-										{updateNoteMutation.isPending ? 'Saving...' : 'Save'}
-									</Button>
-								</div>
-							</div>
+							// EDITING VIEW
+							<Form {...editNoteForm} key={note.id}>
+								<form onSubmit={editNoteForm.handleSubmit(onSaveEdit)}>
+									<div className="bg-secondary/20 rounded-lg p-4 border">
+										<FormField
+											control={editNoteForm.control}
+											name="content"
+											render={({ field }) => (
+												<FormItem>
+													<FormControl>
+														<Textarea
+															className="min-h-[100px] mb-2"
+															{...field}
+														/>
+													</FormControl>
+													<FormMessage />
+												</FormItem>
+											)}
+										/>
+										<div className="flex justify-end gap-2 mt-2">
+											<Button
+												type="button"
+												variant="outline"
+												size="sm"
+												onClick={handleCancelEdit}
+											>
+												Cancel
+											</Button>
+											<Button
+												type="submit"
+												size="sm"
+												disabled={editNoteForm.formState.isSubmitting}
+											>
+												{editNoteForm.formState.isSubmitting
+													? 'Saving...'
+													: 'Save'}
+											</Button>
+										</div>
+									</div>
+								</form>
+							</Form>
 						) : (
+							// DISPLAY VIEW
 							<div key={note.id} className="bg-secondary/20 rounded-lg p-4 border">
 								<div className="flex items-start justify-between gap-4">
 									<div className="flex-1">
@@ -269,21 +298,35 @@ const NotesSection: React.FC<NotesSectionProps> = ({ projectId, endpointId }) =>
 				</div>
 			)}
 
+			{/* ADD NOTE FORM */}
 			<div className="border-t pt-4 space-y-3">
-				<Textarea
-					value={newNoteContent}
-					onChange={(e) => setNewNoteContent(e.target.value)}
-					placeholder="Add a note about this endpoint... Mention a user with @username"
-					className="min-h-[100px]"
-				/>
-
-				<Button
-					onClick={handleAddNote}
-					disabled={createNoteMutation.isPending || !newNoteContent.trim()}
-					className="w-full"
-				>
-					{createNoteMutation.isPending ? 'Adding Note...' : 'Add Note'}
-				</Button>
+				<Form {...addNoteForm}>
+					<form onSubmit={addNoteForm.handleSubmit(onAddNote)} className="space-y-3">
+						<FormField
+							control={addNoteForm.control}
+							name="content"
+							render={({ field }) => (
+								<FormItem>
+									<FormControl>
+										<Textarea
+											placeholder="Add a note about this endpoint... Mention a user with @username"
+											className="min-h-[100px]"
+											{...field}
+										/>
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
+						/>
+						<Button
+							type="submit"
+							disabled={addNoteForm.formState.isSubmitting}
+							className="w-full"
+						>
+							{addNoteForm.formState.isSubmitting ? 'Adding Note...' : 'Add Note'}
+						</Button>
+					</form>
+				</Form>
 			</div>
 		</div>
 	);

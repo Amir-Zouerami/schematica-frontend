@@ -1,10 +1,11 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { ApiError } from '@/utils/api';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { AlertCircle } from 'lucide-react';
-import React, { useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { z } from 'zod';
 
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import {
 	Card,
@@ -14,14 +15,25 @@ import {
 	CardHeader,
 	CardTitle,
 } from '@/components/ui/card';
+import {
+	Form,
+	FormControl,
+	FormField,
+	FormItem,
+	FormLabel,
+	FormMessage,
+} from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+
+// 1. Define the Zod schema for the form
+const formSchema = z.object({
+	username: z.string().min(1, { message: 'Username is required.' }),
+	password: z.string().min(1, { message: 'Password is required.' }),
+});
+
+type LoginFormValues = z.infer<typeof formSchema>;
 
 const LoginForm = () => {
-	const [username, setUsername] = useState('');
-	const [password, setPassword] = useState('');
-	const [isLoading, setIsLoading] = useState(false);
-	const [error, setError] = useState<string | null>(null);
 	const { login } = useAuth();
 	const navigate = useNavigate();
 	const location = useLocation();
@@ -29,24 +41,35 @@ const LoginForm = () => {
 	const fromLocation = location.state?.from;
 	const redirectTo = fromLocation && fromLocation.pathname !== '/login' ? fromLocation : '/';
 
-	const handleSubmit = async (e: React.FormEvent) => {
-		e.preventDefault();
-		setError(null);
-		setIsLoading(true);
+	// 2. Initialize the form with react-hook-form
+	const form = useForm<LoginFormValues>({
+		resolver: zodResolver(formSchema),
+		defaultValues: {
+			username: '',
+			password: '',
+		},
+	});
 
+	const { isSubmitting } = form.formState;
+
+	// 3. Define the submit handler
+	const onSubmit = async (values: LoginFormValues) => {
 		try {
-			await login(username, password);
+			await login(values.username, values.password);
 			navigate(redirectTo, { replace: true });
 		} catch (err) {
-			if (err instanceof ApiError) {
-				setError(err.message);
-			} else if (err instanceof Error) {
-				setError(err.message);
+			if (err instanceof ApiError && (err.status === 401 || err.status === 400)) {
+				// Set a general form error, not tied to a specific field
+				form.setError('root.serverError', {
+					type: 'manual',
+					message: err.message || 'Invalid username or password.',
+				});
 			} else {
-				setError('An unexpected error occurred during login.');
+				form.setError('root.serverError', {
+					type: 'manual',
+					message: 'An unexpected error occurred during login.',
+				});
 			}
-		} finally {
-			setIsLoading(false);
 		}
 	};
 
@@ -59,44 +82,60 @@ const LoginForm = () => {
 				<CardDescription>Enter your credentials to access the platform</CardDescription>
 			</CardHeader>
 			<CardContent>
-				<form onSubmit={handleSubmit} className="space-y-4" autoComplete="on">
-					{error && (
-						<Alert variant="destructive">
-							<AlertCircle className="h-4 w-4" />
-							<AlertTitle>Error</AlertTitle>
-							<AlertDescription>{error}</AlertDescription>
-						</Alert>
-					)}
-					<div className="space-y-2">
-						<Label htmlFor="username">Username</Label>
-						<Input
-							id="username"
-							type="text"
+				{/* 4. Use the Shadcn Form component */}
+				<Form {...form}>
+					<form
+						onSubmit={form.handleSubmit(onSubmit)}
+						className="space-y-4"
+						autoComplete="on"
+					>
+						{form.formState.errors.root?.serverError && (
+							<div className="flex items-center gap-x-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-red-500 dark:text-red-400">
+								<AlertCircle className="h-4 w-4" />
+								<span>{form.formState.errors.root.serverError.message}</span>
+							</div>
+						)}
+						<FormField
+							control={form.control}
 							name="username"
-							autoComplete="username"
-							value={username}
-							onChange={(e) => setUsername(e.target.value)}
-							required
-							className="bg-background/50"
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>Username</FormLabel>
+									<FormControl>
+										<Input
+											type="text"
+											autoComplete="username"
+											className="bg-background/50"
+											{...field}
+										/>
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
 						/>
-					</div>
-					<div className="space-y-2">
-						<Label htmlFor="password">Password</Label>
-						<Input
-							id="password"
-							type="password"
+						<FormField
+							control={form.control}
 							name="password"
-							autoComplete="current-password"
-							value={password}
-							onChange={(e) => setPassword(e.target.value)}
-							required
-							className="bg-background/50"
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>Password</FormLabel>
+									<FormControl>
+										<Input
+											type="password"
+											autoComplete="current-password"
+											className="bg-background/50"
+											{...field}
+										/>
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
 						/>
-					</div>
-					<Button type="submit" disabled={isLoading} className="w-full mt-5">
-						{isLoading ? 'Logging in...' : 'Login'}
-					</Button>
-				</form>
+						<Button type="submit" disabled={isSubmitting} className="w-full mt-5">
+							{isSubmitting ? 'Logging in...' : 'Login'}
+						</Button>
+					</form>
+				</Form>
 			</CardContent>
 			<CardFooter>
 				<p className="text-xs text-muted-foreground">
