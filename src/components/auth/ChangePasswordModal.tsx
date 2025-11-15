@@ -33,7 +33,6 @@ interface ChangePasswordModalProps {
 	redirectTo?: string;
 }
 
-// A factory function to create a Zod schema based on the form mode
 const getFormSchema = (mode: 'change' | 'set') => {
 	let schema = z
 		.object({
@@ -68,7 +67,7 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 	onClose,
 	redirectTo = '/login',
 }) => {
-	const { changePassword, logout } = useAuth();
+	const { user, changePassword, logout } = useAuth();
 	const setPasswordMutation = useSetPassword();
 	const { toast } = useToast();
 	const navigate = useNavigate();
@@ -91,13 +90,15 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 
 	useEffect(() => {
 		if (isOpen) {
-			// Reset the form state whenever the modal is opened
 			form.reset();
-			setFormMode('change');
+			if (user?.hasPassword === false) {
+				setFormMode('set');
+			} else {
+				setFormMode('change');
+			}
 		}
-	}, [isOpen, form]);
+	}, [isOpen, user, form]);
 
-	// Re-validate the form if the mode changes (e.g., from 'change' to 'set')
 	useEffect(() => {
 		form.trigger();
 	}, [formMode, form.trigger]);
@@ -115,25 +116,11 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 				onClose();
 				navigate(redirectTo, { replace: true });
 			} catch (err) {
-				if (
-					err instanceof ApiError &&
-					err.errorResponse?.type === 'OAUTH_USER_NO_PASSWORD_SET'
-				) {
-					setFormMode('set');
-					form.clearErrors(); // Clear validation errors for the new mode
-					toast({
-						title: 'Set Your Password',
-						description:
-							'Your account was created via an external provider. Please set a password to enable local login.',
-					});
-				} else {
-					const errorMessage =
-						err instanceof ApiError ? err.message : 'An unexpected error occurred.';
-					form.setError('currentPassword', { type: 'server', message: errorMessage });
-				}
+				const errorMessage =
+					err instanceof ApiError ? err.message : 'An unexpected error occurred.';
+				form.setError('currentPassword', { type: 'server', message: errorMessage });
 			}
 		} else {
-			// 'set' mode
 			try {
 				await setPasswordMutation.mutateAsync({ newPassword: values.newPassword });
 				toast({

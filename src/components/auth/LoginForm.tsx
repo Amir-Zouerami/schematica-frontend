@@ -1,7 +1,7 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { ApiError } from '@/utils/api';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Gitlab } from 'lucide-react'; // Import Gitlab from lucide-react
 import { useForm } from 'react-hook-form';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
@@ -25,7 +25,6 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 
-// 1. Define the Zod schema for the form
 const formSchema = z.object({
 	username: z.string().min(1, { message: 'Username is required.' }),
 	password: z.string().min(1, { message: 'Password is required.' }),
@@ -41,7 +40,6 @@ const LoginForm = () => {
 	const fromLocation = location.state?.from;
 	const redirectTo = fromLocation && fromLocation.pathname !== '/login' ? fromLocation : '/';
 
-	// 2. Initialize the form with react-hook-form
 	const form = useForm<LoginFormValues>({
 		resolver: zodResolver(formSchema),
 		defaultValues: {
@@ -52,14 +50,12 @@ const LoginForm = () => {
 
 	const { isSubmitting } = form.formState;
 
-	// 3. Define the submit handler
 	const onSubmit = async (values: LoginFormValues) => {
 		try {
 			await login(values.username, values.password);
 			navigate(redirectTo, { replace: true });
 		} catch (err) {
 			if (err instanceof ApiError && (err.status === 401 || err.status === 400)) {
-				// Set a general form error, not tied to a specific field
 				form.setError('root.serverError', {
 					type: 'manual',
 					message: err.message || 'Invalid username or password.',
@@ -82,7 +78,6 @@ const LoginForm = () => {
 				<CardDescription>Enter your credentials to access the platform</CardDescription>
 			</CardHeader>
 			<CardContent>
-				{/* 4. Use the Shadcn Form component */}
 				<Form {...form}>
 					<form
 						onSubmit={form.handleSubmit(onSubmit)}
@@ -136,6 +131,22 @@ const LoginForm = () => {
 						</Button>
 					</form>
 				</Form>
+
+				<div className="relative my-6">
+					<div className="absolute inset-0 flex items-center">
+						<span className="w-full border-t" />
+					</div>
+					<div className="relative flex justify-center text-xs uppercase">
+						<span className="bg-card px-2 text-muted-foreground">Or continue with</span>
+					</div>
+				</div>
+
+				<Button variant="outline" className="w-full h-12" asChild>
+					<a href="/api/v2/auth/gitlab">
+						<Gitlab className="mr-2 h-5! w-5!" />
+						Login with GitLab
+					</a>
+				</Button>
 			</CardContent>
 			<CardFooter>
 				<p className="text-xs text-muted-foreground">
