@@ -126,7 +126,13 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 				description: `Endpoint status has been successfully changed to ${newStatus}.`,
 			});
 		} catch (err) {
-			const errorMessage = err instanceof ApiError ? err.message : 'Failed to update status.';
+			let errorMessage = 'Failed to update status.';
+			if (err instanceof ApiError && err.status === 409) {
+				errorMessage =
+					'Conflict: The status was updated by someone else. Please refresh to see the latest changes.';
+			} else if (err instanceof ApiError) {
+				errorMessage = err.message;
+			}
 			toast({ title: 'Update Failed', description: errorMessage, variant: 'destructive' });
 		}
 	};
@@ -171,9 +177,19 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 			});
 			setIsDeleteDialogOpen(false);
 		} catch (err) {
-			const errorMessage =
-				err instanceof ApiError ? err.message : 'Failed to delete endpoint.';
-			toast({ title: 'Delete Failed', description: errorMessage, variant: 'destructive' });
+			let description = 'An unexpected error occurred while deleting the endpoint.';
+			if (err instanceof ApiError) {
+				if (err.status === 403) {
+					description =
+						'You do not have the required permissions to delete this endpoint.';
+				} else if (err.status === 404) {
+					description =
+						'This endpoint could not be found. It may have already been deleted.';
+				} else {
+					description = err.message;
+				}
+			}
+			toast({ title: 'Delete Failed', description, variant: 'destructive' });
 		}
 	};
 

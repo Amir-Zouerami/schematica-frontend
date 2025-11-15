@@ -6,7 +6,7 @@ import type { components } from '@/types/api-types';
 import { ApiError } from '@/utils/api';
 import { formatDate } from '@/utils/schemaUtils';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Edit, Trash2 } from 'lucide-react';
+import { Edit, MessageSquareX, Trash2 } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -24,6 +24,13 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from '@/components/ui/empty';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
@@ -35,7 +42,6 @@ interface NotesSectionProps {
 	endpointId: string;
 }
 
-// Zod schemas for validation
 const noteSchema = z.object({
 	content: z.string().min(1, { message: 'Note content cannot be empty.' }),
 });
@@ -55,18 +61,15 @@ const NotesSection: React.FC<NotesSectionProps> = ({ projectId, endpointId }) =>
 	const deleteNoteMutation = useDeleteNote();
 	const updateNoteMutation = useUpdateNote();
 
-	// Form for adding a new note
 	const addNoteForm = useForm<NoteFormValues>({
 		resolver: zodResolver(noteSchema),
 		defaultValues: { content: '' },
 	});
 
-	// Form for editing an existing note
 	const editNoteForm = useForm<NoteFormValues>({
 		resolver: zodResolver(noteSchema),
 	});
 
-	// When editingNote changes, reset the edit form with the new content
 	useEffect(() => {
 		if (editingNote) {
 			editNoteForm.reset({ content: editingNote.content });
@@ -83,7 +86,6 @@ const NotesSection: React.FC<NotesSectionProps> = ({ projectId, endpointId }) =>
 
 	const onSaveEdit = async (values: NoteFormValues) => {
 		if (!editingNote) return;
-
 		try {
 			await updateNoteMutation.mutateAsync({
 				noteId: editingNote.id,
@@ -159,12 +161,23 @@ const NotesSection: React.FC<NotesSectionProps> = ({ projectId, endpointId }) =>
 	return (
 		<div className="space-y-4">
 			{!notes || notes.length === 0 ? (
-				<p className="text-muted-foreground text-center py-8">No notes added yet</p>
+				<div className="py-8">
+					<Empty>
+						<EmptyHeader>
+							<EmptyMedia variant="icon">
+								<MessageSquareX />
+							</EmptyMedia>
+							<EmptyTitle>No Notes Yet</EmptyTitle>
+							<EmptyDescription>
+								Add a note below to start a discussion about this endpoint.
+							</EmptyDescription>
+						</EmptyHeader>
+					</Empty>
+				</div>
 			) : (
 				<div className="space-y-4">
 					{notes.map((note) =>
 						editingNote?.id === note.id ? (
-							// EDITING VIEW
 							<Form {...editNoteForm} key={note.id}>
 								<form onSubmit={editNoteForm.handleSubmit(onSaveEdit)}>
 									<div className="bg-secondary/20 rounded-lg p-4 border">
@@ -206,7 +219,6 @@ const NotesSection: React.FC<NotesSectionProps> = ({ projectId, endpointId }) =>
 								</form>
 							</Form>
 						) : (
-							// DISPLAY VIEW
 							<div key={note.id} className="bg-secondary/20 rounded-lg p-4 border">
 								<div className="flex items-start justify-between gap-4">
 									<div className="flex-1">
@@ -297,8 +309,6 @@ const NotesSection: React.FC<NotesSectionProps> = ({ projectId, endpointId }) =>
 					)}
 				</div>
 			)}
-
-			{/* ADD NOTE FORM */}
 			<div className="border-t pt-4 space-y-3">
 				<Form {...addNoteForm}>
 					<form onSubmit={addNoteForm.handleSubmit(onAddNote)} className="space-y-3">

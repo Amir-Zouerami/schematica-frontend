@@ -1,12 +1,22 @@
 import { useCreateEndpoint, useUpdateEndpoint } from '@/hooks/api/useEndpoints';
 import { useToast } from '@/hooks/use-toast';
-import { ApiError } from '@/utils/api';
+import { api, ApiError } from '@/utils/api';
+import { formatDate } from '@/utils/schemaUtils';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { X } from 'lucide-react';
-import React, { useEffect, useId, useMemo, useState } from 'react';
+import { RefreshCw, X } from 'lucide-react';
+import React, { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
 import { z } from 'zod';
 
+import {
+	AlertDialog,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
@@ -38,6 +48,12 @@ import FormResponsesSection from './FormSections/FormResponsesSection';
 
 // --- Type Definitions ---
 type EndpointDto = components['schemas']['EndpointDto'];
+
+interface ConflictDetails {
+	message: string;
+	serverUpdatedAt?: string;
+	lastUpdatedBy?: string;
+}
 
 // --- Helper for JSON validation in Zod ---
 const jsonString = z.string().refine(
@@ -106,6 +122,69 @@ interface EndpointFormProps {
 	openApiSpec: OpenAPISpec;
 }
 
+const transformEndpointToFormValues = (endpoint?: EndpointDto | null): EndpointFormValues => {
+	if (!endpoint) {
+		return {
+			path: '',
+			method: 'get' as EndpointFormValues['method'],
+			summary: '',
+			description: '',
+			tags: [],
+			isDeprecated: false,
+			parameters: [],
+			requestBody: null,
+			responses: [
+				{
+					statusCode: '200',
+					description: 'Successful response',
+					schemaString: '{}',
+					exampleString: '{}',
+				},
+			],
+		};
+	}
+
+	const op = endpoint.operation as unknown as OperationObject;
+	const requestBody = op.requestBody as RequestBodyObject | undefined;
+	const contentType = requestBody
+		? Object.keys(requestBody.content || {})[0] || 'application/json'
+		: 'application/json';
+	const mediaType = requestBody?.content?.[contentType] as MediaTypeObject | undefined;
+
+	return {
+		path: endpoint.path,
+		method: endpoint.method as EndpointFormValues['method'],
+		summary: op.summary || '',
+		description: op.description || '',
+		tags: op.tags || [],
+		isDeprecated: op.deprecated || false,
+		parameters: (op.parameters as any[]) || [],
+		requestBody: requestBody
+			? {
+					description: requestBody.description || '',
+					required: requestBody.required || false,
+					contentType: contentType,
+					schemaString: JSON.stringify(mediaType?.schema || {}, null, 2),
+					exampleString: JSON.stringify(mediaType?.example || {}, null, 2),
+				}
+			: null,
+		responses: Object.entries(op.responses as Record<string, ResponseObject>).map(
+			([statusCode, resp]) => {
+				const respContentType = Object.keys(resp.content || {})[0] || 'application/json';
+				const respMediaType = resp.content?.[respContentType] as
+					| MediaTypeObject
+					| undefined;
+				return {
+					statusCode,
+					description: resp.description,
+					schemaString: JSON.stringify(respMediaType?.schema || {}, null, 2),
+					exampleString: JSON.stringify(respMediaType?.example || {}, null, 2),
+				};
+			},
+		),
+	};
+};
+
 const EndpointForm: React.FC<EndpointFormProps> = ({ projectId, endpoint, onClose }) => {
 	const { toast } = useToast();
 	const formId = useId();
@@ -113,81 +192,18 @@ const EndpointForm: React.FC<EndpointFormProps> = ({ projectId, endpoint, onClos
 	const updateEndpointMutation = useUpdateEndpoint();
 
 	const [lastKnownUpdatedAt, setLastKnownUpdatedAt] = useState<string | undefined>(undefined);
-	const [conflictDetails, setConflictDetails] = useState<any | null>(null);
+	const [conflictDetails, setConflictDetails] = useState<ConflictDetails | null>(null);
 	const [currentTagInput, setCurrentTagInput] = useState('');
 
-	const formValues = useMemo(() => {
-		if (!endpoint) {
-			return {
-				path: '',
-				method: 'get' as EndpointFormValues['method'],
-				summary: '',
-				description: '',
-				tags: [],
-				isDeprecated: false,
-				parameters: [],
-				requestBody: null,
-				responses: [
-					{
-						statusCode: '200',
-						description: 'Successful response',
-						schemaString: '{}',
-						exampleString: '{}',
-					},
-				],
-			};
-		}
-
-		const op = endpoint.operation as unknown as OperationObject;
-		const requestBody = op.requestBody as RequestBodyObject | undefined;
-		const contentType = requestBody
-			? Object.keys(requestBody.content || {})[0] || 'application/json'
-			: 'application/json';
-		const mediaType = requestBody?.content?.[contentType] as MediaTypeObject | undefined;
-
-		return {
-			path: endpoint.path,
-			method: endpoint.method as EndpointFormValues['method'],
-			summary: op.summary || '',
-			description: op.description || '',
-			tags: op.tags || [],
-			isDeprecated: op.deprecated || false,
-			parameters: (op.parameters as any[]) || [],
-			requestBody: requestBody
-				? {
-						description: requestBody.description || '',
-						required: requestBody.required || false,
-						contentType: contentType,
-						schemaString: JSON.stringify(mediaType?.schema || {}, null, 2),
-						exampleString: JSON.stringify(mediaType?.example || {}, null, 2),
-					}
-				: null,
-			responses: Object.entries(op.responses as Record<string, ResponseObject>).map(
-				([statusCode, resp]) => {
-					const respContentType =
-						Object.keys(resp.content || {})[0] || 'application/json';
-					const respMediaType = resp.content?.[respContentType] as
-						| MediaTypeObject
-						| undefined;
-					return {
-						statusCode,
-						description: resp.description,
-						schemaString: JSON.stringify(respMediaType?.schema || {}, null, 2),
-						exampleString: JSON.stringify(respMediaType?.example || {}, null, 2),
-					};
-				},
-			),
-		};
-	}, [endpoint]);
+	const formValues = useMemo(() => transformEndpointToFormValues(endpoint), [endpoint]);
 
 	const methods = useForm<EndpointFormValues>({
 		resolver: zodResolver(endpointFormSchema),
-		values: formValues, // Use the memoized values to initialize the form
+		values: formValues,
 	});
 
 	const { isSubmitting } = methods.formState;
 
-	// This effect now only handles resetting the form on external changes and setting the timestamp
 	useEffect(() => {
 		methods.reset(formValues);
 		if (endpoint) {
@@ -262,10 +278,11 @@ const EndpointForm: React.FC<EndpointFormProps> = ({ projectId, endpoint, onClos
 			const error = err as ApiError;
 			if (error?.status === 409) {
 				if (error.message.includes('Concurrency conflict')) {
+					const errorData = error.errorResponse as any;
 					setConflictDetails({
 						message: error.message,
-						serverUpdatedAt: (error.errorResponse as any)?.serverUpdatedAt,
-						lastUpdatedBy: (error.errorResponse as any)?.lastUpdatedBy,
+						serverUpdatedAt: errorData?.serverUpdatedAt,
+						lastUpdatedBy: errorData?.lastUpdatedBy,
 					});
 				} else {
 					methods.setError('path', { type: 'server', message: error.message });
@@ -289,6 +306,45 @@ const EndpointForm: React.FC<EndpointFormProps> = ({ projectId, endpoint, onClos
 			}
 			setCurrentTagInput('');
 		}
+	};
+
+	const handleForceSubmitFromDialog = () => {
+		processSubmit(methods.getValues(), true);
+	};
+
+	const handleRefreshAndDiscardEdits = useCallback(async () => {
+		if (!endpoint?.id) return;
+		setConflictDetails(null);
+		try {
+			const response = await api.get<EndpointDto>(
+				`/projects/${projectId}/endpoints/${endpoint.id}`,
+			);
+			if (response.data) {
+				const newFormValues = transformEndpointToFormValues(response.data);
+				methods.reset(newFormValues);
+				setLastKnownUpdatedAt(response.data.updatedAt);
+				toast({
+					title: 'Data Refreshed',
+					description: 'Form has been updated with the latest server data.',
+				});
+			}
+		} catch (err) {
+			toast({
+				title: 'Refresh Failed',
+				description: 'Could not fetch latest endpoint data.',
+				variant: 'destructive',
+			});
+		}
+	}, [endpoint, projectId, methods, toast]);
+
+	const handleCloseConflictDialogOnly = () => {
+		setConflictDetails(null);
+		toast({
+			title: 'Conflict Noted',
+			description:
+				'Your unsaved edits are still in the form. You can copy them before proceeding.',
+			duration: 7000,
+		});
 	};
 
 	return (
@@ -495,7 +551,70 @@ const EndpointForm: React.FC<EndpointFormProps> = ({ projectId, endpoint, onClos
 				</Card>
 			</FormProvider>
 
-			{/* Concurrency Conflict Dialog would go here, similar to ProjectForm */}
+			{conflictDetails && (
+				<AlertDialog
+					open={!!conflictDetails}
+					onOpenChange={(isOpen) => !isOpen && setConflictDetails(null)}
+				>
+					<AlertDialogContent className="max-w-5xl w-[900px]">
+						<AlertDialogHeader>
+							<AlertDialogTitle>Concurrency Conflict</AlertDialogTitle>
+							<AlertDialogDescription asChild>
+								<div>
+									<p className="mb-1">{conflictDetails.message}</p>
+									<div className="my-5 leading-relaxed text-sm">
+										{conflictDetails.lastUpdatedBy && (
+											<p>
+												<strong>Last updated by:</strong>{' '}
+												{conflictDetails.lastUpdatedBy}
+											</p>
+										)}
+										{conflictDetails.serverUpdatedAt && (
+											<p>
+												<strong>Last server update:</strong>{' '}
+												{formatDate(conflictDetails.serverUpdatedAt)}
+											</p>
+										)}
+										<p className="mt-2">
+											Your current unsaved edits are still in the form.
+										</p>
+									</div>
+								</div>
+							</AlertDialogDescription>
+						</AlertDialogHeader>
+						<AlertDialogFooter className="flex-col space-y-2 sm:flex-row sm:space-y-0 sm:space-x-2 mt-2">
+							<Button
+								className="w-full sm:w-auto"
+								variant="outline"
+								onClick={handleCloseConflictDialogOnly}
+							>
+								<X className="mr-2 h-4 w-4" /> Review My Edits
+							</Button>
+							<Button
+								className="w-full sm:w-auto"
+								variant="secondary"
+								onClick={handleRefreshAndDiscardEdits}
+							>
+								<RefreshCw className="mr-2 h-4 w-4" /> Refresh & Discard My Edits
+							</Button>
+							<Button
+								className="w-full sm:w-auto"
+								variant="destructive"
+								onClick={handleForceSubmitFromDialog}
+							>
+								Force Overwrite With My Edits
+							</Button>
+						</AlertDialogFooter>
+						<AlertDialogCancel
+							onClick={handleCloseConflictDialogOnly}
+							className="absolute right-4 top-4"
+						>
+							<X className="h-4 w-4" />
+							<span className="sr-only">Close</span>
+						</AlertDialogCancel>
+					</AlertDialogContent>
+				</AlertDialog>
+			)}
 		</>
 	);
 };
