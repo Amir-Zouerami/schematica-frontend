@@ -1,8 +1,9 @@
-import { ChevronsUpDown, Users as TeamsIcon } from 'lucide-react';
-import React, { useEffect, useRef, useState } from 'react';
+import { ChevronsUpDown, Loader2, Users as TeamsIcon } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
+import { useSearchableList } from '@/shared/lib/hooks/useSearchableList';
+import { Avatar, AvatarFallback, AvatarImage } from '@/shared/ui/avatar';
+import { Button } from '@/shared/ui/button';
 import {
 	Command,
 	CommandEmpty,
@@ -10,13 +11,10 @@ import {
 	CommandInput,
 	CommandItem,
 	CommandList,
-} from '@/components/ui/command';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useSearchableList } from '@/hooks/api/useSearchableList'; // Import the new hook
+} from '@/shared/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
 
-// Define the shape of the items we'll be working with internally for rendering
-type SelectableItem = {
+export type SelectableItem = {
 	id: string;
 	name: string;
 	image?: string | null;
@@ -24,7 +22,7 @@ type SelectableItem = {
 
 interface UserTeamSelectorProps {
 	type: 'user' | 'team';
-	onSelect: (id: string) => void;
+	onSelect: (item: SelectableItem) => void;
 	disabledIds: string[];
 	triggerText: string;
 }
@@ -39,7 +37,6 @@ const UserTeamSelector: React.FC<UserTeamSelectorProps> = ({
 	const [searchTerm, setSearchTerm] = useState('');
 	const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
 
-	// Debounce the search term before passing it to the data-fetching hook
 	useEffect(() => {
 		const handler = setTimeout(() => {
 			setDebouncedSearchTerm(searchTerm);
@@ -47,30 +44,23 @@ const UserTeamSelector: React.FC<UserTeamSelectorProps> = ({
 		return () => clearTimeout(handler);
 	}, [searchTerm]);
 
-	// Use our new, clean, abstracted hook
-	const { data, error, fetchNextPage, hasNextPage, isFetching, isFetchingNextPage, isLoading } =
-		useSearchableList(type, debouncedSearchTerm);
+	// Define minimum search length
+	const MIN_SEARCH_LENGTH = 2;
+	const isSearchLengthValid =
+		debouncedSearchTerm.length >= MIN_SEARCH_LENGTH || debouncedSearchTerm.length === 0;
 
-	// Flatten the pages of data into a single array for rendering
-	const allItems: SelectableItem[] =
-		data?.pages
-			.flatMap((page) => page.data) // `page.data` is the array of users/teams
+	const { data, error, isLoading } = useSearchableList(type, debouncedSearchTerm);
+
+	const availableItems: SelectableItem[] = useMemo(() => {
+		if (!data) return [];
+		return data
 			.map((item) => ({
 				id: item.id,
 				name: 'username' in item ? item.username : item.name,
 				image: 'profileImage' in item ? item.profileImage : null,
 			}))
-			.filter((item) => !disabledIds.includes(item.id)) || [];
-
-	const listRef = useRef<HTMLDivElement>(null);
-
-	// Infinite scroll logic
-	const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-		const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
-		if (scrollHeight - scrollTop - clientHeight < 20 && hasNextPage && !isFetchingNextPage) {
-			fetchNextPage();
-		}
-	};
+			.filter((item) => !disabledIds.includes(item.id));
+	}, [data, disabledIds]);
 
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
@@ -87,38 +77,36 @@ const UserTeamSelector: React.FC<UserTeamSelectorProps> = ({
 			</PopoverTrigger>
 
 			<PopoverContent onWheel={(e) => e.stopPropagation()} className="w-[250px] p-0">
-				<Command>
+				<Command shouldFilter={false}>
 					<CommandInput
 						placeholder={`Search ${type}...`}
 						value={searchTerm}
 						onValueChange={setSearchTerm}
-						disabled={isLoading && !isFetching}
 					/>
-					<CommandList
-						ref={listRef}
-						onScroll={handleScroll}
-						className="max-h-64 overflow-y-auto"
-					>
-						{isLoading ? (
-							<div className="p-2 space-y-2">
-								<Skeleton className="h-8 w-full" />
-								<Skeleton className="h-8 w-full" />
-								<Skeleton className="h-8 w-full" />
+
+					<CommandList className="max-h-64 overflow-y-auto">
+						{!isSearchLengthValid ? (
+							<div className="py-6 text-center text-sm text-muted-foreground">
+								Type at least {MIN_SEARCH_LENGTH} characters...
 							</div>
-						) : allItems.length === 0 && !isFetching ? (
+						) : isLoading ? (
+							<div className="flex items-center justify-center py-6">
+								<Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+							</div>
+						) : availableItems.length === 0 ? (
 							<CommandEmpty>No results found.</CommandEmpty>
 						) : (
 							<CommandGroup>
-								{allItems.map((item) => (
+								{availableItems.map((item) => (
 									<CommandItem
 										key={item.id}
 										value={item.name}
 										onSelect={() => {
-											onSelect(item.id);
+											onSelect(item);
 											setSearchTerm('');
 											setOpen(false);
 										}}
-										className="flex items-center gap-2"
+										className="flex items-center gap-2 cursor-pointer"
 									>
 										{type === 'user' ? (
 											<Avatar className="h-6 w-6">
@@ -135,11 +123,7 @@ const UserTeamSelector: React.FC<UserTeamSelectorProps> = ({
 								))}
 							</CommandGroup>
 						)}
-						{isFetchingNextPage && (
-							<div className="py-2 flex justify-center">
-								<p className="text-xs text-muted-foreground">Loading more...</p>
-							</div>
-						)}
+
 						{error && (
 							<div className="py-2 px-4">
 								<p className="text-xs text-destructive">Failed to load data.</p>
