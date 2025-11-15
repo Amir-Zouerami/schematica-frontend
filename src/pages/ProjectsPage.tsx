@@ -1,13 +1,21 @@
 import ProjectCard from '@/components/projects/ProjectCard';
 import ProjectForm from '@/components/projects/ProjectForm';
 import { Button } from '@/components/ui/button';
+import {
+	Empty,
+	EmptyContent,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from '@/components/ui/empty';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDeleteProject, useProjects } from '@/hooks/api/useProjects';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
 import type { components } from '@/types/api-types';
 import { ApiError } from '@/utils/api';
-import { Plus } from 'lucide-react';
+import { FolderSearch, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 type ProjectSummaryDto = components['schemas']['ProjectSummaryDto'];
@@ -32,10 +40,21 @@ const ProjectsPage = () => {
 				description: 'The project has been successfully deleted.',
 			});
 		} catch (err) {
-			const errorMessage = err instanceof ApiError ? err.message : 'Failed to delete project';
+			let description = 'An unexpected error occurred while deleting the project.';
+			if (err instanceof ApiError) {
+				if (err.status === 403) {
+					description =
+						'You do not have the required permissions to delete this project.';
+				} else if (err.status === 404) {
+					description =
+						'This project could not be found. It may have already been deleted by someone else.';
+				} else {
+					description = err.message;
+				}
+			}
 			toast({
-				title: 'Error',
-				description: errorMessage,
+				title: 'Delete Failed',
+				description,
 				variant: 'destructive',
 			});
 		}
@@ -83,24 +102,27 @@ const ProjectsPage = () => {
 			</div>
 
 			{projects.length === 0 ? (
-				<div className="text-center py-20">
-					<h2 className="text-2xl font-semibold text-muted-foreground mb-4">
-						No projects yet
-					</h2>
-					{canCreateProject ? (
-						<>
-							<p className="text-muted-foreground mb-6">
-								Create your first project to get started
-							</p>
-							<Button onClick={handleCreateProject}>
-								<Plus className="h-4 w-4 mr-2" /> Create Your First Project
-							</Button>
-						</>
-					) : (
-						<p className="text-muted-foreground">
-							Projects will appear here once they are created.
-						</p>
-					)}
+				<div className="py-20">
+					<Empty>
+						<EmptyHeader>
+							<EmptyMedia variant="icon">
+								<FolderSearch />
+							</EmptyMedia>
+							<EmptyTitle>No Projects Found</EmptyTitle>
+							<EmptyDescription>
+								{canCreateProject
+									? 'Get started by creating your first project.'
+									: 'Projects you have access to will appear here.'}
+							</EmptyDescription>
+						</EmptyHeader>
+						{canCreateProject && (
+							<EmptyContent>
+								<Button onClick={handleCreateProject}>
+									<Plus className="h-4 w-4 mr-2" /> Create Project
+								</Button>
+							</EmptyContent>
+						)}
+					</Empty>
 				</div>
 			) : (
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

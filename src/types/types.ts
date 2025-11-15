@@ -6,6 +6,7 @@ export interface OpenAPISpec {
 	components?: ComponentsObject;
 	tags?: TagObject[];
 	externalDocs?: ExternalDocumentationObject;
+	[key: string]: any;
 }
 
 export interface InfoObject {
