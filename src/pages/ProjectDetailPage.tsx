@@ -6,7 +6,6 @@ import ProjectAccessForm from '@/components/projects/ProjectAccessForm';
 import ProjectForm from '@/components/projects/ProjectForm';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useEndpoints } from '@/hooks/api/useEndpoints';
 import { useOpenApiSpec, useProject } from '@/hooks/api/useProject';
 import { useDeleteProject } from '@/hooks/api/useProjects';
 import { useToast } from '@/hooks/use-toast';
@@ -34,14 +33,13 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const ProjectDetailPage = () => {
-	const { projectId } = useParams<{ projectId: string }>();
+	const { projectId, endpointId } = useParams<{ projectId: string; endpointId?: string }>();
 	const navigate = useNavigate();
 	const { toast } = useToast();
 	const { isProjectOwner } = usePermissions();
 
 	const { data: project, isLoading: projectLoading, error: projectError } = useProject(projectId);
 	const { data: openApiSpec, isLoading: specLoading } = useOpenApiSpec(projectId);
-	const { data: endpoints, isLoading: endpointsLoading } = useEndpoints(projectId);
 	const deleteProjectMutation = useDeleteProject();
 
 	const [isAccessModalOpen, setIsAccessModalOpen] = useState(false);
@@ -49,7 +47,7 @@ const ProjectDetailPage = () => {
 	const [isOpenApiEditorOpen, setIsOpenApiEditorOpen] = useState(false);
 	const [isEditProjectModalOpen, setIsEditProjectModalOpen] = useState(false);
 
-	const isLoading = projectLoading || specLoading || endpointsLoading;
+	const isLoading = projectLoading || specLoading;
 
 	const handleEditProject = () => setIsEditProjectModalOpen(true);
 	const handleDeleteProject = () => setIsDeleteDialogOpen(true);
@@ -339,7 +337,11 @@ const ProjectDetailPage = () => {
 						</div>
 					)}
 					{openApiSpec ? (
-						<EndpointsList openApiSpec={openApiSpec} projectId={projectId || ''} />
+						<EndpointsList
+							openApiSpec={openApiSpec}
+							projectId={projectId || ''}
+							endpointId={endpointId}
+						/>
 					) : (
 						!isLoading && (
 							<p className="text-muted-foreground text-center py-8">

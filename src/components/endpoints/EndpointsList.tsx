@@ -13,18 +13,24 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { OpenAPISpec } from '@/types/types';
 import { ApiError } from '@/utils/api';
 import React, { useEffect, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import EndpointDetailLoader from './EndpointDetailLoader';
 
 interface EndpointsListProps {
 	openApiSpec: OpenAPISpec;
 	projectId: string;
+	endpointId?: string; // The new prop
 }
 
-const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId }) => {
+const EndpointsList: React.FC<EndpointsListProps> = ({
+	openApiSpec,
+	projectId,
+	endpointId, // The new prop
+}) => {
 	const { isProjectOwner } = usePermissions();
 	const { data: project } = useProject(projectId);
 	const location = useLocation();
+	const navigate = useNavigate();
 
 	const { data, error, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } =
 		useEndpoints(projectId);
@@ -57,31 +63,40 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 		return orderedGroups;
 	}, [allEndpoints]);
 
-	const generateClientSideId = (method: string, path: string): string => {
-		const methodPart = method.toLowerCase();
-		const pathPart = path
-			.replace(/^\//, '')
-			.replace(/[\/{}]/g, '-')
-			.replace(/[^a-zA-Z0-9-]/g, '');
-		return `${methodPart}-${pathPart}`;
+	// This function remains for scrolling and opening, but is now used by both methods
+	const openAndScrollToEndpoint = (endpointClientSideId: string) => {
+		if (!openAccordionItems.includes(endpointClientSideId)) {
+			setOpenAccordionItems((prev) => [...prev, endpointClientSideId]);
+		}
+		setItemToScrollTo(endpointClientSideId);
+
+		// We remove the hash from the URL for a cleaner look after navigation
+		if (location.hash) {
+			navigate(location.pathname, { replace: true });
+		}
 	};
 
+	// New logic: Prioritize the endpointId prop
 	useEffect(() => {
-		if (location.hash && allEndpoints) {
-			const elementIdFromHash = location.hash.substring(1);
-			const endpointMatch = allEndpoints.find(
-				(ep) => generateClientSideId(ep.method, ep.path) === elementIdFromHash,
-			);
-			if (endpointMatch) {
-				const clientSideId = generateClientSideId(endpointMatch.method, endpointMatch.path);
-				if (!openAccordionItems.includes(clientSideId)) {
-					setOpenAccordionItems((prev) => [...prev, clientSideId]);
-				}
-				setItemToScrollTo(clientSideId);
+		if (allEndpoints.length > 0) {
+			let targetEndpoint;
+			// 1. Prioritize the endpointId from the URL prop
+			if (endpointId) {
+				targetEndpoint = allEndpoints.find((ep) => ep.id === endpointId);
+			}
+			// 2. Fallback to the hash for old links
+			else if (location.hash) {
+				const elementIdFromHash = location.hash.substring(1);
+				targetEndpoint = allEndpoints.find((ep) => ep.id === elementIdFromHash);
+			}
+
+			if (targetEndpoint) {
+				openAndScrollToEndpoint(targetEndpoint.id);
 			}
 		}
-	}, [location.hash, allEndpoints]);
+	}, [endpointId, location.hash, allEndpoints, navigate]);
 
+	// Logic for scrolling the view to the opened item
 	useEffect(() => {
 		if (itemToScrollTo && openAccordionItems.includes(itemToScrollTo)) {
 			const element = document.getElementById(itemToScrollTo);
@@ -148,62 +163,56 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId })
 						value={openAccordionItems}
 						onValueChange={setOpenAccordionItems}
 					>
-						{endpointsInGroup.map((endpoint) => {
-							const clientSideId = generateClientSideId(
-								endpoint.method,
-								endpoint.path,
-							);
-							return (
-								<AccordionItem
-									key={endpoint.id}
-									value={clientSideId}
-									id={clientSideId}
-									className="border border-border rounded-lg overflow-hidden"
-								>
-									<AccordionTrigger className="px-4 py-2 hover:bg-secondary/30 transition-colors data-[state=open]:border-b">
-										<div className="flex items-center space-x-3 w-full text-left">
-											<Badge
-												className={`uppercase text-white font-bold w-[70px] text-center justify-center ${
-													methodColors[endpoint.method] || 'bg-gray-500'
-												}`}
+						{endpointsInGroup.map((endpoint) => (
+							<AccordionItem
+								key={endpoint.id}
+								value={endpoint.id} // Use the real endpoint ID for the accordion value
+								id={endpoint.id} // Use the real endpoint ID for the DOM element ID
+								className="border border-border rounded-lg overflow-hidden"
+							>
+								<AccordionTrigger className="px-4 py-2 hover:bg-secondary/30 transition-colors data-[state=open]:border-b">
+									<div className="flex items-center space-x-3 w-full text-left">
+										<Badge
+											className={`uppercase text-white font-bold w-[70px] text-center justify-center ${
+												methodColors[endpoint.method] || 'bg-gray-500'
+											}`}
+										>
+											{endpoint.method}
+										</Badge>
+										<span className="font-mono font-semibold text-sm truncate flex-grow min-w-0">
+											{endpoint.path}
+										</span>
+										{endpoint.summary && (
+											<span
+												className="text-xs text-muted-foreground truncate hidden md:block ml-4 max-w-[300px] flex-shrink"
+												style={{ unicodeBidi: 'plaintext' }}
 											>
-												{endpoint.method}
-											</Badge>
-											<span className="font-mono font-semibold text-sm truncate flex-grow min-w-0">
-												{endpoint.path}
+												{endpoint.summary}
 											</span>
-											{endpoint.summary && (
-												<span
-													className="text-xs text-muted-foreground truncate hidden md:block ml-4 max-w-[300px] flex-shrink"
-													style={{ unicodeBidi: 'plaintext' }}
-												>
-													{endpoint.summary}
-												</span>
-											)}
-											{endpoint.status === 'DEPRECATED' && (
-												<Badge
-													variant="outline"
-													className="ml-auto flex-shrink-0"
-												>
-													Deprecated
-												</Badge>
-											)}
+										)}
+										{endpoint.status === 'DEPRECATED' && (
+											<Badge
+												variant="outline"
+												className="ml-auto flex-shrink-0"
+											>
+												Deprecated
+											</Badge>
+										)}
+									</div>
+								</AccordionTrigger>
+								<AccordionContent className="p-0">
+									<div className="pt-4">
+										<div className="border-t border-border">
+											<EndpointDetailLoader
+												projectId={projectId}
+												endpointId={endpoint.id}
+												openApiSpec={openApiSpec}
+											/>
 										</div>
-									</AccordionTrigger>
-									<AccordionContent className="p-0">
-										<div className="pt-4">
-											<div className="border-t border-border">
-												<EndpointDetailLoader
-													projectId={projectId}
-													endpointId={endpoint.id}
-													openApiSpec={openApiSpec}
-												/>
-											</div>
-										</div>
-									</AccordionContent>
-								</AccordionItem>
-							);
-						})}
+									</div>
+								</AccordionContent>
+							</AccordionItem>
+						))}
 					</Accordion>
 				</div>
 			))}

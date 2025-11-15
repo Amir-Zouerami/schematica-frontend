@@ -38,7 +38,6 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Copy, Edit3, Link as LinkIcon, Lock, Trash2 } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
 
 import { ApiError } from '@/utils/api';
 import { convertOpenApiToCurl } from '@/utils/openApiUtils';
@@ -61,7 +60,6 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 	const { user } = useAuth();
 	const { isProjectOwner } = usePermissions();
 	const { toast } = useToast();
-	const location = useLocation();
 	const { data: project } = useProject(projectId);
 
 	const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -133,18 +131,8 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 		}
 	};
 
-	const handleFormSubmit = async (formDataFromForm: any) => {
-		console.log('Form data to submit:', formDataFromForm);
-		setIsEditDialogOpen(false);
-	};
-
-	const generateClientSideId = (method: string, path: string): string => {
-		return `${method.toLowerCase()}-${path.replace(/^\//, '').replace(/[\/{}]/g, '-')}`;
-	};
-
 	const handleShareEndpoint = () => {
-		const clientSideId = generateClientSideId(endpoint.method, endpoint.path);
-		const url = `${window.location.origin}${location.pathname}#${clientSideId}`;
+		const url = `${window.location.origin}/projects/${projectId}/endpoints/${endpoint.id}`;
 		navigator.clipboard.writeText(url);
 		toast({ title: 'URL Copied', description: 'Link to this endpoint copied.' });
 	};
@@ -457,7 +445,6 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 							projectId={projectId}
 							endpoint={endpoint}
 							onClose={handleCloseEditDialog}
-							onSubmit={handleFormSubmit}
 							openApiSpec={openApiSpec}
 						/>
 					</DialogContent>
