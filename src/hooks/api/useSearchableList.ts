@@ -18,26 +18,33 @@ export const useSearchableList = (type: 'user' | 'team', searchTerm: string) => 
 	const queryKey = [`search-${type}s`, searchTerm];
 	const endpoint = type === 'user' ? '/users' : '/teams';
 
+	// Only enable the query if the search term is empty or has 2+ characters
+	const isSearchEnabled = searchTerm.length === 0 || searchTerm.length >= 2;
+
 	return useInfiniteQuery({
 		queryKey,
 		queryFn: async ({ pageParam }) => {
-			// --- FIX APPLIED HERE ---
-			// Only include the 'search' parameter if the term is long enough.
-			// The `api.ts` helper will automatically omit `undefined` properties.
-			const validSearchTerm = searchTerm.length >= 2 ? searchTerm : undefined;
-
+			const queryParams: Record<string, any> = { page: pageParam, limit: 20 };
+			// Only add the search param if the term is valid
+			if (searchTerm) {
+				queryParams.search = searchTerm;
+			}
 			const response = await api.get<ListData>(endpoint, {
-				params: { page: pageParam, limit: 20, search: validSearchTerm },
+				params: queryParams,
 			});
 			return response;
 		},
 		initialPageParam: 1,
 		getNextPageParam: (lastPage) => {
+			// The API for these lists returns a flat structure.
+			// The meta is directly on the response object from our api wrapper.
 			const { page, lastPage: totalPages } = lastPage.meta;
 			if (!totalPages || page >= totalPages) {
 				return undefined;
 			}
 			return page + 1;
 		},
+		// Add the 'enabled' flag here
+		enabled: isSearchEnabled,
 	});
 };

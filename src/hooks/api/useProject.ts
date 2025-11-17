@@ -51,9 +51,9 @@ export const useUpdateOpenApi = () => {
 		}: {
 			projectId: string;
 			spec: UpdateOpenApiSpecDto['spec'];
-			lastKnownUpdatedAt: UpdateOpenApiSpecDto['lastKnownUpdatedAt'];
+			lastKnownUpdatedAt?: UpdateOpenApiSpecDto['lastKnownUpdatedAt'];
 		}) => {
-			const payload: UpdateOpenApiSpecDto = { spec, lastKnownUpdatedAt };
+			const payload: UpdateOpenApiSpecDto = { spec, lastKnownUpdatedAt: lastKnownUpdatedAt! };
 			const response = await api.put(`/projects/${projectId}/openapi`, payload);
 			return response.data;
 		},

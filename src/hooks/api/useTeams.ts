@@ -8,10 +8,23 @@ type UpdateTeamDto = components['schemas']['UpdateTeamDto'];
 
 export const TEAMS_QUERY_KEY = ['teams'];
 
-export const useTeams = () => {
+export const useTeams = (page = 1, limit = 10, search = '') => {
+	const isSearchEnabled = search.length === 0 || search.length >= 2;
+
 	return useQuery({
-		queryKey: TEAMS_QUERY_KEY,
-		queryFn: () => api.get<TeamDto[]>('/teams'),
+		queryKey: [TEAMS_QUERY_KEY, { page, limit, search }],
+		queryFn: () => {
+			const queryParams: Record<string, any> = { page, limit };
+			if (search) {
+				queryParams.search = search;
+			}
+			return api.get<TeamDto[]>('/teams', {
+				params: queryParams,
+			});
+		},
+
+		enabled: isSearchEnabled,
+		placeholderData: (previousData) => previousData,
 	});
 };
 
@@ -20,7 +33,7 @@ export const useCreateTeam = () => {
 	return useMutation({
 		mutationFn: (teamData: CreateTeamDto) => api.post<TeamDto>('/admin/teams', teamData),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: TEAMS_QUERY_KEY });
+			queryClient.invalidateQueries({ queryKey: [TEAMS_QUERY_KEY] });
 		},
 	});
 };
@@ -31,7 +44,7 @@ export const useUpdateTeam = () => {
 		mutationFn: ({ teamId, teamData }: { teamId: string; teamData: UpdateTeamDto }) =>
 			api.put<TeamDto>(`/admin/teams/${teamId}`, teamData),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: TEAMS_QUERY_KEY });
+			queryClient.invalidateQueries({ queryKey: [TEAMS_QUERY_KEY] });
 		},
 	});
 };
@@ -41,7 +54,7 @@ export const useDeleteTeam = () => {
 	return useMutation({
 		mutationFn: (teamId: string) => api.delete<null>(`/admin/teams/${teamId}`),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: TEAMS_QUERY_KEY });
+			queryClient.invalidateQueries({ queryKey: [TEAMS_QUERY_KEY] });
 		},
 	});
 };
