@@ -25,10 +25,14 @@ export default defineConfig({
 	build: {
 		outDir: '../schematica-api/public',
 		target: 'es2022',
+		chunkSizeWarningLimit: 1000,
 		rollupOptions: {
 			output: {
 				manualChunks: {
+					// Chunk Monaco separately so it caches efficiently
 					monaco: ['monaco-editor', '@monaco-editor/react'],
+					// Chunk Vendor libs
+					vendor: ['react', 'react-dom', 'react-router-dom'],
 				},
 			},
 		},
