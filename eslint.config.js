@@ -11,12 +11,10 @@ import tseslint from 'typescript-eslint';
 
 export default defineConfig([
 	{
-		ignores: ['dist', 'src/components/ui/**'],
+		ignores: ['dist', 'src/shared/ui/**'],
 	},
-
 	{
 		files: ['**/*.{ts,tsx}'],
-
 		languageOptions: {
 			parser: tseslint.parser,
 			parserOptions: {
@@ -26,30 +24,22 @@ export default defineConfig([
 			},
 			globals: globals.browser,
 		},
-
 		extends: [
 			js.configs.recommended,
 			...tseslint.configs.recommended,
 			reactHooks.configs.recommended,
 			eslintPluginPrettierRecommended,
 		],
-
 		plugins: {
 			'@stylistic': stylistic,
 			'react-refresh': reactRefresh,
 		},
-
 		rules: {
 			'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
-
 			'@typescript-eslint/no-explicit-any': 'off',
-
 			'@stylistic/brace-style': ['error', 'stroustrup', { allowSingleLine: false }],
-
 			'@stylistic/indent': 'off',
-
 			'prettier/prettier': ['error', { endOfLine: 'auto' }],
-
 			'@typescript-eslint/no-unused-vars': [
 				'error',
 				{

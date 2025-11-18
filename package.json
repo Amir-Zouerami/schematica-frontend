@@ -1,7 +1,7 @@
 {
 	"name": "schematica-frontend",
 	"private": true,
-	"version": "1.2.1",
+	"version": "2.0.0",
 	"description": "The frontend for Schematica (a collaborative API documentation platform)",
 	"type": "module",
 	"keywords": [
@@ -17,9 +17,10 @@
 		"build:dev": "vite build --mode development",
 		"build:watch": "vite build --watch",
 		"lint": "eslint . --fix",
+		"typecheck": "tsc --noEmit",
 		"preview": "vite preview",
 		"format": "prettier --write \"./**/*.ts\"",
-		"types:gen": "openapi-typescript http://localhost:3000/docs-json -o src/types/api-types.ts"
+		"types:gen": "openapi-typescript http://localhost:3000/docs-json -o src/shared/types/api-types.ts"
 	},
 	"dependencies": {
 		"@hookform/resolvers": "^5.2.2",
@@ -65,12 +66,14 @@
 		"input-otp": "^1.4.2",
 		"js-yaml": "^4.1.1",
 		"lucide-react": "^0.553.0",
+		"monaco-editor": "^0.55.1",
 		"monaco-themes": "^0.4.7",
 		"next-themes": "^0.4.6",
 		"react": "^19.2.0",
 		"react-day-picker": "^9.11.1",
 		"react-dom": "^19.2.0",
 		"react-hook-form": "^7.66.0",
+		"react-markdown": "^10.1.0",
 		"react-resizable-panels": "^3.0.6",
 		"react-router-dom": "^7.9.5",
 		"react-spinners": "^0.17.0",
@@ -82,7 +85,8 @@
 		"uuid": "^13.0.0",
 		"vaul": "^1.1.2",
 		"vite-plugin-monaco-editor": "^1.1.0",
-		"zod": "^4.1.12"
+		"zod": "^4.1.12",
+		"zustand": "^5.0.8"
 	},
 	"devDependencies": {
 		"@eslint/js": "^9.39.1",
