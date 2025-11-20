@@ -1,3 +1,4 @@
+import { formatDate } from '@/shared/lib/schemaUtils';
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -6,8 +7,7 @@ import {
 	AlertDialogFooter,
 	AlertDialogHeader,
 	AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { formatDate } from '@/utils/schemaUtils';
+} from '@/shared/ui/alert-dialog';
 import { Lock } from 'lucide-react';
 import React from 'react';
 
@@ -32,6 +32,7 @@ const LockConflictModal: React.FC<LockConflictModalProps> = ({ isOpen, onClose, 
 					<AlertDialogTitle className="flex items-center gap-2">
 						<Lock className="h-5 w-5" /> Endpoint is Locked
 					</AlertDialogTitle>
+
 					<AlertDialogDescription className="pt-4 text-base">
 						This endpoint is currently being edited by{' '}
 						<strong className="text-foreground">{lockDetails.username}</strong>.
@@ -40,6 +41,7 @@ const LockConflictModal: React.FC<LockConflictModalProps> = ({ isOpen, onClose, 
 						again later.
 					</AlertDialogDescription>
 				</AlertDialogHeader>
+
 				<AlertDialogFooter>
 					<AlertDialogAction onClick={onClose}>OK</AlertDialogAction>
 				</AlertDialogFooter>

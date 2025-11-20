@@ -1,12 +1,10 @@
+import { useAuth } from '@/app/providers/AuthContext';
 import ChangePasswordModal from '@/components/auth/ChangePasswordModal';
-import UpdateProfilePictureModal from '@/components/profile/UpdateProfilePictureModal';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import NotificationBell from '@/components/notifications/NotificationBell';
-import { useAuth } from '@/contexts/AuthContext';
-import type { components } from '@/types/api-types';
-import { Key, LogOut, Shield, UserCircle } from 'lucide-react';
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import UpdateProfilePictureModal from '@/components/profile/UpdateProfilePictureModal';
+import { useMe } from '@/entities/User/api/useMe';
+import { getStorageUrl } from '@/shared/lib/storage';
+import { Avatar, AvatarFallback, AvatarImage } from '@/shared/ui/avatar';
 
 import {
 	DropdownMenu,
@@ -14,12 +12,14 @@ import {
 	DropdownMenuItem,
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-
-type TeamDto = components['schemas']['TeamDto'];
+} from '@/shared/ui/dropdown-menu';
+import { Key, LogOut, Shield, UserCircle } from 'lucide-react';
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 
 const AppHeader = () => {
-	const { user, logout, isAuthenticated } = useAuth();
+	const { logout, isAuthenticated } = useAuth();
+	const { data: user } = useMe();
 	const navigate = useNavigate();
 	const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 	const [isProfilePictureModalOpen, setIsProfilePictureModalOpen] = useState(false);
@@ -29,21 +29,21 @@ const AppHeader = () => {
 		navigate('/login', { replace: true });
 	};
 
-	const teamNames = user?.teams?.map((team: TeamDto) => team.name).join(', ') || 'No teams';
-	const profileImageUrl = typeof user?.profileImage === 'string' ? user.profileImage : undefined;
+	const teamNames = user?.teams?.map((team) => team.name).join(', ') || 'No teams';
+	const profileImageUrl = getStorageUrl(user?.profileImage);
 
 	return (
 		<>
 			<header className="border-b border-border py-4">
 				<div className="container mx-auto px-4 flex justify-between items-center">
 					<Link to="/" className="flex items-center space-x-2">
-						<h1 className="text-gradient-warm-sunset text-2xl font-bold">
+						<h1 className="text-gradient-warm-sunset text-xl md:text-2xl font-bold truncate max-w-[200px] md:max-w-none">
 							{import.meta.env.VITE_BRAND_NAME} API Docs
 						</h1>
 					</Link>
 
 					{isAuthenticated && user && (
-						<div className="flex items-center space-x-4">
+						<div className="flex items-center space-x-2 md:space-x-4">
 							<div className="flex items-center space-x-2">
 								<NotificationBell />
 
@@ -60,7 +60,7 @@ const AppHeader = () => {
 												</AvatarFallback>
 											</Avatar>
 
-											<div className="text-sm hidden sm:block">
+											<div className="text-sm hidden sm:block text-left">
 												<p className="font-medium">{user.username}</p>
 												<p className="text-xs text-muted-foreground capitalize">
 													{user.role}
@@ -127,6 +127,7 @@ const AppHeader = () => {
 					)}
 				</div>
 			</header>
+
 			<ChangePasswordModal
 				isOpen={isChangePasswordOpen}
 				onClose={() => setIsChangePasswordOpen(false)}
