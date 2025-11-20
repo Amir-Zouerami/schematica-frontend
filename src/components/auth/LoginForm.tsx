@@ -1,12 +1,11 @@
-import { useAuth } from '@/contexts/AuthContext';
-import { ApiError } from '@/utils/api';
+import { useAuth } from '@/app/providers/AuthContext';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { AlertCircle, Gitlab } from 'lucide-react'; // Import Gitlab from lucide-react
+import { AlertCircle, Gitlab } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@/shared/ui/button';
 import {
 	Card,
 	CardContent,
@@ -14,16 +13,9 @@ import {
 	CardFooter,
 	CardHeader,
 	CardTitle,
-} from '@/components/ui/card';
-import {
-	Form,
-	FormControl,
-	FormField,
-	FormItem,
-	FormLabel,
-	FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
+} from '@/shared/ui/card';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/shared/ui/form';
+import { Input } from '@/shared/ui/input';
 
 const formSchema = z.object({
 	username: z.string().min(1, { message: 'Username is required.' }),
@@ -55,17 +47,12 @@ const LoginForm = () => {
 			await login(values.username, values.password);
 			navigate(redirectTo, { replace: true });
 		} catch (err) {
-			if (err instanceof ApiError && (err.status === 401 || err.status === 400)) {
-				form.setError('root.serverError', {
-					type: 'manual',
-					message: err.message || 'Invalid username or password.',
-				});
-			} else {
-				form.setError('root.serverError', {
-					type: 'manual',
-					message: 'An unexpected error occurred during login.',
-				});
-			}
+			const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+
+			form.setError('root.serverError', {
+				type: 'manual',
+				message: errorMessage,
+			});
 		}
 	};
 
@@ -75,8 +62,10 @@ const LoginForm = () => {
 				<CardTitle className="text-gradient text-2xl font-bold">
 					{import.meta.env.VITE_BRAND_NAME} API Docs
 				</CardTitle>
+
 				<CardDescription>Enter your credentials to access the platform</CardDescription>
 			</CardHeader>
+
 			<CardContent>
 				<Form {...form}>
 					<form
@@ -90,6 +79,7 @@ const LoginForm = () => {
 								<span>{form.formState.errors.root.serverError.message}</span>
 							</div>
 						)}
+
 						<FormField
 							control={form.control}
 							name="username"
@@ -108,6 +98,7 @@ const LoginForm = () => {
 								</FormItem>
 							)}
 						/>
+
 						<FormField
 							control={form.control}
 							name="password"
@@ -126,6 +117,7 @@ const LoginForm = () => {
 								</FormItem>
 							)}
 						/>
+
 						<Button type="submit" disabled={isSubmitting} className="w-full mt-5">
 							{isSubmitting ? 'Logging in...' : 'Login'}
 						</Button>
@@ -136,6 +128,7 @@ const LoginForm = () => {
 					<div className="absolute inset-0 flex items-center">
 						<span className="w-full border-t" />
 					</div>
+
 					<div className="relative flex justify-center text-xs uppercase">
 						<span className="bg-card px-2 text-muted-foreground">Or continue with</span>
 					</div>
@@ -148,6 +141,7 @@ const LoginForm = () => {
 					</a>
 				</Button>
 			</CardContent>
+
 			<CardFooter>
 				<p className="text-xs text-muted-foreground">
 					Please contact {import.meta.env.VITE_BRAND_NAME} team for support.

@@ -1,14 +1,14 @@
-import { useAuth } from '@/contexts/AuthContext';
-import { useSetPassword } from '@/hooks/api/useUsers';
-import { useToast } from '@/hooks/use-toast';
-import { ApiError } from '@/utils/api';
+import { useAuth } from '@/app/providers/AuthContext';
+import { useMe } from '@/entities/User/api/useMe';
+import { useSetPassword } from '@/entities/User/api/useUsers';
+import { ApiError } from '@/shared/api/api';
 import { zodResolver } from '@hookform/resolvers/zod';
 import React, { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 
-import { Button } from '@/components/ui/button';
+import { Button } from '@/shared/ui/button';
 import {
 	Dialog,
 	DialogContent,
@@ -16,16 +16,9 @@ import {
 	DialogFooter,
 	DialogHeader,
 	DialogTitle,
-} from '@/components/ui/dialog';
-import {
-	Form,
-	FormControl,
-	FormField,
-	FormItem,
-	FormLabel,
-	FormMessage,
-} from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
+} from '@/shared/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/shared/ui/form';
+import { Input } from '@/shared/ui/input';
 
 interface ChangePasswordModalProps {
 	isOpen: boolean;
@@ -67,10 +60,10 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 	onClose,
 	redirectTo = '/login',
 }) => {
-	const { user, changePassword, logout } = useAuth();
-	const setPasswordMutation = useSetPassword();
-	const { toast } = useToast();
 	const navigate = useNavigate();
+	const { data: user } = useMe();
+	const { changePassword, logout } = useAuth();
+	const setPasswordMutation = useSetPassword();
 
 	const [formMode, setFormMode] = useState<'change' | 'set'>('change');
 
@@ -99,21 +92,17 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 		}
 	}, [isOpen, user, form]);
 
-	useEffect(() => {
-		form.trigger();
-	}, [formMode, form.trigger]);
-
 	const onSubmit = async (values: FormValues) => {
 		if (formMode === 'change') {
 			try {
 				await changePassword(values.currentPassword!, values.newPassword);
-				toast({
-					title: 'Password Changed Successfully',
-					description: 'Your password has been updated. You will now be logged out.',
-					duration: 3000,
-				});
-				await logout();
 				onClose();
+
+				logout({
+					title: 'Password Changed Successfully',
+					description: 'Your password has been updated. Please log in again.',
+				});
+
 				navigate(redirectTo, { replace: true });
 			} catch (err) {
 				const errorMessage =
@@ -123,14 +112,13 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 		} else {
 			try {
 				await setPasswordMutation.mutateAsync({ newPassword: values.newPassword });
-				toast({
-					title: 'Password Set Successfully',
-					description:
-						'Your password has been set. You will be logged out to log in again.',
-					duration: 3000,
-				});
-				await logout();
 				onClose();
+
+				logout({
+					title: 'Password Set Successfully',
+					description: 'Your password has been set. Please log in again.',
+				});
+
 				navigate(redirectTo, { replace: true });
 			} catch (err) {
 				const errorMessage =
@@ -142,18 +130,19 @@ const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
 
 	return (
 		<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-			<DialogContent className="sm:max-w-md max-w-4xl">
+			<DialogContent className="sm:max-w-md">
 				<DialogHeader>
 					<DialogTitle>
 						{formMode === 'change' ? 'Change Password' : 'Set Password'}
 					</DialogTitle>
+
 					<DialogDescription>
 						{formMode === 'change'
 							? 'Enter your current password and choose a new password.'
 							: 'Choose a password for your account to enable logging in locally.'}
-						{' The new password must be at least 8 characters long.'}
 					</DialogDescription>
 				</DialogHeader>
+
 				<Form {...form}>
 					<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
 						{form.formState.errors.root?.serverError && (
