@@ -1,0 +1,304 @@
+/* Optional Google Font import */
+/* @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap'); */
+
+@import 'tailwindcss';
+@config "../../../tailwind.config.ts";
+
+/* ----------------------------- */
+/*           BASE LAYER          */
+/* ----------------------------- */
+
+@layer base {
+	:root {
+		--background: 240 10% 3.9%;
+		--foreground: 0 0% 98%;
+
+		--card: 240 10% 3.9%;
+		--card-foreground: 0 0% 98%;
+
+		--popover: 240 10% 3.9%;
+		--popover-foreground: 0 0% 98%;
+
+		--primary: 0 0% 98%;
+		--primary-foreground: 240 5.9% 10%;
+
+		--secondary: 240 3.7% 15.9%;
+		--secondary-foreground: 0 0% 98%;
+
+		--muted: 240 3.7% 15.9%;
+		--muted-foreground: 240 5% 64.9%;
+
+		--accent: 240 3.7% 15.9%;
+		--accent-foreground: 0 0% 98%;
+
+		--destructive: 0 62.8% 30.6%;
+		--destructive-foreground: 0 0% 98%;
+
+		--border: 240 3.7% 15.9%;
+		--input: 240 3.7% 15.9%;
+		--ring: 240 4.9% 83.9%;
+
+		--radius: 0.5rem;
+
+		--sidebar-background: 240 10% 3.9%;
+		--sidebar-foreground: 0 0% 98%;
+		--sidebar-primary: 217.2 91.2% 59.8%;
+		--sidebar-primary-foreground: 0 0% 100%;
+		--sidebar-accent: 240 3.7% 15.9%;
+		--sidebar-accent-foreground: 0 0% 98%;
+		--sidebar-border: 240 3.7% 15.9%;
+		--sidebar-ring: 217.2 91.2% 59.8%;
+	}
+}
+
+@layer base {
+	/* ----------------------------- */
+	/*           FONTS               */
+	/* ----------------------------- */
+
+	@font-face {
+		font-family: 'JetBrains Mono';
+		src: url('/fonts/JetBrainsMonoNLNerdFont-Thin.ttf') format('truetype');
+		font-weight: 300;
+		font-style: normal;
+		font-display: swap;
+	}
+
+	@font-face {
+		font-family: 'JetBrains Mono';
+		src: url('/fonts/JetBrainsMonoNerdFontMono-Regular.ttf') format('truetype');
+		font-weight: 500;
+		font-style: normal;
+		font-display: swap;
+	}
+
+	@font-face {
+		font-family: 'JetBrains Mono';
+		src: url('/fonts/JetBrainsMonoNerdFont-SemiBold.ttf') format('truetype');
+		font-weight: 600;
+		font-style: normal;
+		font-display: swap;
+	}
+
+	@font-face {
+		font-family: 'JetBrains Mono';
+		src: url('/fonts/JetBrainsMonoNerdFontMono-Bold.ttf') format('truetype');
+		font-weight: 700;
+		font-style: normal;
+		font-display: swap;
+	}
+
+	@font-face {
+		font-family: 'JetBrains Mono';
+		src: url('/fonts/JetBrainsMonoNerdFont-ExtraBold.ttf') format('truetype');
+		font-weight: 800;
+		font-style: normal;
+		font-display: swap;
+	}
+
+	@font-face {
+		font-family: 'NotoSans Arabic';
+		src: url('/fonts/NotoSansArabic-Regular.ttf') format('truetype');
+		font-weight: 500;
+		font-style: normal;
+		font-display: swap;
+		unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+	}
+
+	/* ----------------------------- */
+	/*          BASE RULES           */
+	/* ----------------------------- */
+
+	* {
+		@apply border-border selection:bg-white/10 selection:text-white;
+	}
+
+	*::selection {
+		background-color: #ff1164;
+		color: white;
+	}
+
+	*::-moz-selection {
+		background-color: #ff1164;
+		color: white;
+	}
+
+	body {
+		@apply bg-background text-foreground antialiased;
+		font-feature-settings: 'ss01', 'ss02', 'cv01', 'cv02', 'cv03';
+		scroll-behavior: smooth;
+		font-family:
+			ui-sans-serif,
+			system-ui,
+			sans-serif,
+			'NotoSans Arabic',
+			'Apple Color Emoji',
+			'Segoe UI Emoji',
+			Segoe UI Symbol,
+			'Noto Color Emoji';
+	}
+
+	code,
+	pre {
+		font-family: 'JetBrains Mono', monospace;
+	}
+
+	.prose a {
+		@apply text-blue-500 hover:text-blue-600 hover:underline transition-colors;
+	}
+
+	.auto-scroll-container {
+		transition: max-height 0.3s ease-in-out;
+		overflow: hidden;
+	}
+}
+
+/* ----------------------------- */
+/*        COMPONENTS LAYER       */
+/* ----------------------------- */
+
+@layer components {
+	.glass-card {
+		@apply bg-secondary/30 backdrop-blur-sm border border-border rounded-lg shadow-lg;
+	}
+
+	/* Gradient utilities */
+	.text-gradient {
+		@apply bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent;
+	}
+
+	.text-gradient-green {
+		@apply bg-gradient-to-r from-emerald-400 to-teal-500 bg-clip-text text-transparent;
+	}
+
+	.text-gradient-blue {
+		@apply bg-gradient-to-r from-sky-400 to-blue-500 bg-clip-text text-transparent;
+	}
+
+	.text-gradient-orange {
+		@apply bg-gradient-to-r from-amber-400 to-orange-500 bg-clip-text text-transparent;
+	}
+
+	.text-gradient-red {
+		@apply bg-gradient-to-r from-red-400 to-rose-500 bg-clip-text text-transparent;
+	}
+
+	.text-gradient-gold {
+		@apply bg-gradient-to-r from-amber-300 via-yellow-400 to-orange-500 bg-clip-text text-transparent;
+	}
+
+	.text-gradient-cool-blue {
+		@apply bg-gradient-to-r from-cyan-400 to-blue-600 bg-clip-text text-transparent;
+	}
+
+	.text-gradient-sunset {
+		@apply bg-gradient-to-r from-amber-500 via-orange-600 to-red-500 bg-clip-text text-transparent;
+	}
+
+	.text-gradient-pink-sunset {
+		@apply bg-gradient-to-r from-pink-500 via-orange-500 to-yellow-500 bg-clip-text text-transparent;
+	}
+
+	.text-gradient-emerald-ocean {
+		@apply bg-gradient-to-r from-teal-400 via-cyan-500 to-blue-500 bg-clip-text text-transparent;
+	}
+
+	.text-gradient-royal {
+		@apply bg-gradient-to-r from-purple-500 via-indigo-500 to-blue-500 bg-clip-text text-transparent;
+	}
+
+	.text-gradient-fiery {
+		@apply bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 bg-clip-text text-transparent;
+	}
+
+	.text-gradient-mint {
+		@apply bg-gradient-to-r from-green-300 via-teal-400 to-cyan-500 bg-clip-text text-transparent;
+	}
+
+	.text-gradient-cotton-candy {
+		@apply bg-gradient-to-r from-pink-300 via-purple-200 to-indigo-600 bg-clip-text text-transparent;
+	}
+
+	.text-gradient-earthy {
+		@apply bg-gradient-to-r from-amber-600 via-orange-500 to-yellow-400 bg-clip-text text-transparent;
+	}
+
+	.text-gradient-space {
+		@apply bg-gradient-to-r from-indigo-600 via-purple-700 to-pink-700 bg-clip-text text-transparent;
+	}
+
+	.text-gradient-tropical {
+		@apply bg-gradient-to-r from-green-400 via-cyan-500 to-blue-500 bg-clip-text text-transparent;
+	}
+
+	.text-gradient-neon {
+		@apply bg-gradient-to-r from-green-400 via-cyan-400 to-purple-500 bg-clip-text text-transparent;
+	}
+
+	.text-gradient-warm-sunset {
+		@apply bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 bg-clip-text text-transparent;
+	}
+}
+
+/* ----------------------------- */
+/*        MISC ELEMENTS          */
+/* ----------------------------- */
+
+@keyframes scrollIntoView {
+	to {
+		scroll-margin-top: 20px;
+	}
+}
+
+.collapsible-content {
+	transition: height 300ms ease;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+
+::-webkit-scrollbar-track {
+	background: hsl(var(--muted));
+	border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+	background: hsl(var(--primary));
+	border-radius: 5px;
+	border: 2px solid hsl(var(--muted));
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: hsl(var(--primary) / 0.8);
+}
+
+html {
+	scrollbar-width: thin;
+	scrollbar-color: hsl(var(--primary)) hsl(var(--muted));
+	scroll-behavior: smooth;
+}
+
+input,
+textarea,
+.input,
+[contenteditable],
+p,
+span,
+div,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+td,
+th {
+	unicode-bidi: plaintext;
+}
+
+.prose {
+	text-align: start;
+}
