@@ -1,7 +1,6 @@
-import { useEffect } from 'react';
-import { useMonaco } from '@monaco-editor/react';
-import MonacoEditor from '@monaco-editor/react';
+import MonacoEditor, { useMonaco } from '@monaco-editor/react';
 import githubDarkTheme from 'monaco-themes/themes/GitHub Dark.json';
+import { useEffect } from 'react';
 
 interface OpenApiMonacoEditorProps {
 	value: string;

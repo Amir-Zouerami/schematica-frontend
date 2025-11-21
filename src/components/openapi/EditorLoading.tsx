@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Progress } from '@/components/ui/progress';
+import { Progress } from '@/shared/ui/progress';
+import { useEffect, useState } from 'react';
 
 function EditorLoading() {
 	const [progress, setProgress] = useState(13);
