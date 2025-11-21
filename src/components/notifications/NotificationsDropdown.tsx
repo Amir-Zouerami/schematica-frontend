@@ -1,19 +1,19 @@
 import {
-	Empty,
-	EmptyDescription,
-	EmptyHeader,
-	EmptyMedia,
-	EmptyTitle,
-} from '@/components/ui/empty';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { useMarkNotificationAsRead } from '@/hooks/api/useNotifications';
-import { cn } from '@/lib/utils';
-import type { components } from '@/types/api-types';
-import { formatDate } from '@/utils/schemaUtils';
-import { BellRing, Inbox, Loader2 } from 'lucide-react';
+	useMarkAllNotificationsAsRead,
+	useMarkNotificationAsRead,
+} from '@/entities/Notification/api/useNotifications';
+import { useToast } from '@/hooks/use-toast';
+import { getStorageUrl } from '@/shared/lib/storage';
+import { cn } from '@/shared/lib/utils';
+import type { components } from '@/shared/types/api-types';
+import { Avatar, AvatarFallback, AvatarImage } from '@/shared/ui/avatar';
+import { Button } from '@/shared/ui/button';
+import { ScrollArea } from '@/shared/ui/scroll-area';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/ui/tooltip';
+import { formatDistanceToNow } from 'date-fns';
+import { Bell, CheckCheck, Inbox, Loader2 } from 'lucide-react';
 import React, { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 
 type NotificationDto = components['schemas']['NotificationDto'];
 
@@ -25,40 +25,78 @@ interface NotificationsDropdownProps {
 	isFetchingNextPage: boolean;
 }
 
+const cleanNotificationMessage = (message: string, actorName: string) => {
+	const lowerMsg = message.toLowerCase();
+	const lowerActor = actorName.toLowerCase();
+
+	if (lowerMsg.startsWith(`user '${lowerActor}'`)) {
+		return message.substring(6 + actorName.length + 2).trim();
+	}
+
+	if (message.includes(actorName)) {
+		return message
+			.replace(actorName, '')
+			.replace(/^User '' /, '')
+			.replace(/^User ' '/, '')
+			.trim();
+	}
+
+	return message;
+};
+
 const NotificationItem: React.FC<{
 	notification: NotificationDto;
 	onClick: (notification: NotificationDto) => void;
 }> = ({ notification, onClick }) => {
 	const actorName = notification.actor?.username || 'System';
+	const timeAgo = formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true });
+
+	const displayMessage = cleanNotificationMessage(notification.message, actorName);
 
 	return (
 		<div
 			className={cn(
-				'p-3 hover:bg-secondary cursor-pointer border-b',
-				!notification.isRead && 'bg-blue-500/10 hover:bg-blue-500/20',
+				'group relative p-4 cursor-pointer transition-all duration-200 border-b border-border/40 last:border-0 hover:bg-muted/40',
+				!notification.isRead && 'bg-primary/5 hover:bg-primary/10',
 			)}
 			onClick={() => onClick(notification)}
 		>
-			<div className="flex items-start gap-3">
-				<Avatar className="h-6 w-6">
+			{/* Unread Glow Strip */}
+			{!notification.isRead && (
+				<div className="absolute left-0 top-0 bottom-0 w-[3px] bg-primary shadow-[0_0_10px_rgba(var(--primary),0.6)]" />
+			)}
+
+			<div className="flex items-start gap-4">
+				<Avatar className="h-9 w-9 border border-border/50 shadow-sm shrink-0 mt-0.5">
 					<AvatarImage
-						src={
-							typeof notification.actor?.profileImage === 'string'
-								? notification.actor.profileImage
-								: undefined
-						}
+						src={getStorageUrl(notification.actor?.profileImage)}
 						alt={actorName}
+						className="object-cover"
 					/>
-					<AvatarFallback className="text-xs">
+
+					<AvatarFallback className="text-xs bg-secondary font-medium">
 						{actorName.substring(0, 2).toUpperCase()}
 					</AvatarFallback>
 				</Avatar>
-				<div className="flex-1">
-					<p className="text-sm">{notification.message}</p>
-					<p className="text-xs text-muted-foreground mt-1">
-						{formatDate(notification.createdAt)}
+
+				<div className="flex-1 space-y-1">
+					<p className="text-sm leading-snug text-foreground/90 group-hover:text-foreground transition-colors">
+						<span className="font-semibold text-foreground">{actorName}</span>{' '}
+						<span
+							className="text-muted-foreground"
+							dangerouslySetInnerHTML={{
+								__html: displayMessage,
+							}}
+						/>
+					</p>
+
+					<p className="text-[11px] text-muted-foreground/60 font-medium uppercase tracking-wider">
+						{timeAgo}
 					</p>
 				</div>
+				{!notification.isRead && (
+					<div className="h-2 w-2 rounded-full bg-primary shrink-0 mt-2 shadow-[0_0_5px_rgba(var(--primary),0.5)]" />
+				)}
 			</div>
 		</div>
 	);
@@ -72,12 +110,14 @@ const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
 	isFetchingNextPage,
 }) => {
 	const navigate = useNavigate();
+	const { toast } = useToast();
 	const markAsReadMutation = useMarkNotificationAsRead();
+	const markAllAsReadMutation = useMarkAllNotificationsAsRead();
+
 	const loaderRef = useRef<HTMLDivElement>(null);
 	const scrollAreaRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
-		// Find the actual scrolling element within ScrollArea
 		const scrollViewport = scrollAreaRef.current?.querySelector(
 			'[data-radix-scroll-area-viewport]',
 		);
@@ -90,52 +130,89 @@ const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
 					fetchNextPage();
 				}
 			},
-			{
-				root: scrollViewport, // Observe within the scroll container
-				threshold: 0.1,
-				rootMargin: '50px', // Trigger slightly before reaching the bottom
-			},
+			{ root: scrollViewport, threshold: 0.1, rootMargin: '50px' },
 		);
 
 		const currentLoader = loaderRef.current;
 		observer.observe(currentLoader);
-
-		return () => {
-			observer.unobserve(currentLoader);
-		};
+		return () => observer.unobserve(currentLoader);
 	}, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
 	const handleNotificationClick = (notification: NotificationDto) => {
 		if (!notification.isRead) {
 			markAsReadMutation.mutate(notification.notificationId);
 		}
+
 		navigate(notification.link);
 		onClose();
 	};
 
+	const handleMarkAllRead = () => {
+		markAllAsReadMutation.mutate(undefined, {
+			onSuccess: (data) => {
+				toast({
+					title: 'Success',
+					description: data.message || 'All notifications marked as read.',
+				});
+			},
+
+			onError: () => {
+				toast({
+					title: 'Error',
+					description: 'Failed to mark notifications as read.',
+					variant: 'destructive',
+				});
+			},
+		});
+	};
+
 	return (
-		<div className="flex flex-col h-full">
-			<div className="p-3 border-b">
-				<h4 className="font-semibold text-lg flex items-center gap-2">
-					<BellRing className="h-5 w-5" />
+		<div className="flex flex-col h-[480px] w-full">
+			<div className="flex items-center justify-between px-4 py-3 border-b border-border/40 bg-muted/20">
+				<h4 className="font-semibold text-sm flex items-center gap-2 text-foreground">
+					<Bell className="h-4 w-4 text-primary" />
 					Notifications
 				</h4>
+
+				<Tooltip>
+					<TooltipTrigger asChild>
+						<Button
+							variant="ghost"
+							size="sm"
+							className="h-7 px-2 text-xs text-muted-foreground hover:text-primary hover:bg-primary/10 disabled:opacity-50 cursor-pointer"
+							onClick={handleMarkAllRead}
+							disabled={markAllAsReadMutation.isPending}
+						>
+							{markAllAsReadMutation.isPending ? (
+								<Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+							) : (
+								<CheckCheck className="h-3.5 w-3.5 mr-1.5" />
+							)}
+							Mark all read
+						</Button>
+					</TooltipTrigger>
+
+					<TooltipContent>
+						<p>Mark all notifications as read</p>
+					</TooltipContent>
+				</Tooltip>
 			</div>
+
 			<ScrollArea ref={scrollAreaRef} className="flex-1">
 				{notifications.length === 0 ? (
-					<div className="flex items-center justify-center h-full p-4">
-						<Empty>
-							<EmptyHeader>
-								<EmptyMedia variant="icon">
-									<Inbox className="h-8 w-8" />
-								</EmptyMedia>
-								<EmptyTitle className="text-base">All caught up!</EmptyTitle>
-								<EmptyDescription>You have no new notifications.</EmptyDescription>
-							</EmptyHeader>
-						</Empty>
+					<div className="flex flex-col items-center justify-center h-[400px] p-6 text-center animate-in fade-in zoom-in duration-300">
+						<div className="h-16 w-16 rounded-full bg-muted/30 flex items-center justify-center mb-4">
+							<Inbox className="h-8 w-8 text-muted-foreground/50" />
+						</div>
+
+						<h3 className="font-medium text-foreground">All caught up!</h3>
+
+						<p className="text-sm text-muted-foreground mt-1 max-w-[200px]">
+							You have no new notifications at the moment.
+						</p>
 					</div>
 				) : (
-					<div>
+					<div className="pb-2">
 						{notifications.map((n) => (
 							<NotificationItem
 								key={n.notificationId}
@@ -143,12 +220,13 @@ const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
 								onClick={handleNotificationClick}
 							/>
 						))}
-						<div ref={loaderRef} className="flex justify-center p-4">
+
+						<div ref={loaderRef} className="flex justify-center p-4 min-h-[50px]">
 							{isFetchingNextPage && (
-								<Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-							)}
-							{!isFetchingNextPage && hasNextPage && (
-								<div className="h-1" /> // Invisible trigger element
+								<div className="flex items-center gap-2 text-xs text-muted-foreground">
+									<Loader2 className="h-3.5 w-3.5 animate-spin" />
+									Loading more...
+								</div>
 							)}
 						</div>
 					</div>
