@@ -1,18 +1,18 @@
-import { useAuth } from '@/contexts/AuthContext';
-import type { components } from '@/types/api-types';
+import { useMe } from '@/entities/User/api/useMe';
+import type { components } from '@/shared/types/api-types';
 
 type ProjectDetailDto = components['schemas']['ProjectDetailDto'];
 type TeamDto = components['schemas']['TeamDto'];
+type SanitizedUserDto = components['schemas']['SanitizedUserDto'];
 
-// Re-defining a stricter type for ACL until it's fixed in the generator
 interface AccessControlList {
-	owners: { users: string[]; teams: string[] };
-	viewers: { users: string[]; teams: string[] };
-	deniedUsers: string[];
+	owners: { users: SanitizedUserDto[]; teams: TeamDto[] };
+	viewers: { users: SanitizedUserDto[]; teams: TeamDto[] };
+	deniedUsers: SanitizedUserDto[];
 }
 
 export const usePermissions = () => {
-	const { user } = useAuth();
+	const { data: user } = useMe();
 
 	if (!user) {
 		return {
@@ -34,12 +34,15 @@ export const usePermissions = () => {
 		}
 
 		const access = project.access as unknown as AccessControlList;
-
-		if (access.owners.users.includes(user.id)) {
+		if (access.owners.users.some((ownerUser) => ownerUser.id === user.id)) {
 			return true;
 		}
 
-		if (user.teams?.some((team: TeamDto) => access.owners.teams.includes(team.id))) {
+		if (
+			user.teams?.some((team: TeamDto) =>
+				access.owners.teams.some((ownerTeam) => ownerTeam.id === team.id),
+			)
+		) {
 			return true;
 		}
 

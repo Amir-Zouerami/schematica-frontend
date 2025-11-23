@@ -1,58 +1,43 @@
-import type { components } from '@/types/api-types';
+import { useAuth } from '@/app/providers/AuthContext';
+import type { components } from '@/shared/types/api-types';
 import { useEffect, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
 
 type LockDto = components['schemas']['LockDto'];
 
-/**
- * A custom hook to subscribe to real-time lock status updates for a specific endpoint.
- *
- * @param endpointId The ID of the endpoint to monitor for lock changes.
- * @returns An object containing the current lock status (`LockDto` or `null`) and a loading state.
- */
+interface LockUpdatePayload {
+	resourceId: string;
+	lock: LockDto | null;
+}
+
 export const useEndpointLockSocket = (endpointId: string | undefined) => {
+	const { lockingSocket } = useAuth();
 	const [activeLock, setActiveLock] = useState<LockDto | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 
 	useEffect(() => {
-		if (!endpointId) {
+		if (!endpointId || !lockingSocket) {
 			setIsLoading(false);
 			return;
 		}
 
 		setIsLoading(true);
-		setActiveLock(null);
 
-		const backendUrl = import.meta.env.VITE_WEBSOCKET_URL || 'http://localhost:3000';
-		const token = localStorage.getItem('token');
+		const handleLockUpdate = (data: LockUpdatePayload) => {
+			// Multiplexing Logic: Filter events by resourceId
+			if (data.resourceId === endpointId) {
+				setActiveLock(data.lock);
+				setIsLoading(false);
+			}
+		};
 
-		const socket: Socket = io(`${backendUrl}/locking`, {
-			path: '/socket.io',
-			auth: { token },
-		});
-
-		socket.on('connect', () => {
-			socket.emit('subscribeToResource', endpointId);
-			setIsLoading(false);
-		});
-
-		socket.on('lock_updated', (lockData: LockDto | null) => {
-			setActiveLock(lockData);
-			setIsLoading(false);
-		});
-
-		socket.on('connect_error', (error) => {
-			console.error('Locking socket connection error:', error.message);
-			setIsLoading(false);
-		});
+		// Subscribe
+		lockingSocket.emit('subscribeToResource', endpointId);
+		lockingSocket.on('lock_updated', handleLockUpdate);
 
 		return () => {
-			socket.off('connect');
-			socket.off('lock_updated');
-			socket.off('connect_error');
-			socket.disconnect();
+			lockingSocket.off('lock_updated', handleLockUpdate);
 		};
-	}, [endpointId]);
+	}, [endpointId, lockingSocket]);
 
 	return { activeLock, isLoading };
 };

@@ -1,5 +1,5 @@
+import type { ToastActionElement, ToastProps } from '@/shared/ui/toast';
 import * as React from 'react';
-import type { ToastActionElement, ToastProps } from '@/components/ui/toast';
 
 const TOAST_LIMIT = import.meta.env.VITE_TOAST_LIMIT;
 const TOAST_REMOVE_DELAY = import.meta.env.VITE_TOAST_REMOVE_DELAY;
@@ -184,4 +184,4 @@ function useToast() {
 	};
 }
 
-export { useToast, toast };
+export { toast, useToast };
