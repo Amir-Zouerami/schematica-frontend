@@ -1,7 +1,7 @@
+import { useAuth } from '@/app/providers/AuthContext';
+import LoginForm from '@/components/auth/LoginForm';
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import LoginForm from '@/components/auth/LoginForm';
 
 const LoginPage = () => {
 	const { isAuthenticated, isLoading } = useAuth();
