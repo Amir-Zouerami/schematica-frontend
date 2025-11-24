@@ -1,0 +1,168 @@
+import ParametersTabContent from '@/entities/Endpoint/ui/ParametersTabContent';
+import RequestBodyTabContent from '@/entities/Endpoint/ui/RequestBodyTabContent';
+import ResponsesTabContent from '@/entities/Endpoint/ui/ResponsesTabContent';
+import NotesSection from '@/features/note/list-notes/NotesSection';
+import type {
+	OpenAPISpec,
+	OperationObject,
+	ParameterObject,
+	RequestBodyObject,
+} from '@/shared/types/types';
+import { ScrollArea } from '@/shared/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/tabs';
+import React, { useMemo, useState } from 'react';
+
+interface EndpointDetailTabsProps {
+	projectId: string;
+	endpointId: string;
+	operation: OperationObject;
+	openApiSpec: OpenAPISpec;
+}
+
+const TabScrollContainer: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+	<div className="h-64 w-full overflow-hidden flex flex-col">
+		<ScrollArea className="flex-1 w-full h-full">
+			<div className="min-h-64 flex flex-col *:flex-1">{children}</div>
+		</ScrollArea>
+	</div>
+);
+
+export const EndpointDetailTabs: React.FC<EndpointDetailTabsProps> = ({
+	projectId,
+	endpointId,
+	operation,
+	openApiSpec,
+}) => {
+	const [activeTab, setActiveTab] = useState('headerParams');
+
+	const pathParams = useMemo(
+		() =>
+			(operation.parameters?.filter(
+				(p) => (p as ParameterObject).in === 'path',
+			) as ParameterObject[]) || [],
+		[operation.parameters],
+	);
+
+	const queryParams = useMemo(
+		() =>
+			(operation.parameters?.filter(
+				(p) => (p as ParameterObject).in === 'query',
+			) as ParameterObject[]) || [],
+		[operation.parameters],
+	);
+
+	const headerParams = useMemo(
+		() =>
+			(operation.parameters?.filter(
+				(p) => (p as ParameterObject).in === 'header',
+			) as ParameterObject[]) || [],
+		[operation.parameters],
+	);
+
+	const resolvedRequestBody = useMemo(
+		() => operation.requestBody as RequestBodyObject | null,
+		[operation.requestBody],
+	);
+
+	const responseObjects = useMemo(() => operation.responses, [operation.responses]);
+
+	return (
+		<div>
+			<Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+				<div className="w-full overflow-x-auto pb-1 no-scrollbar">
+					<TabsList className="inline-flex w-auto justify-start">
+						<TabsTrigger
+							className="cursor-pointer whitespace-nowrap"
+							value="headerParams"
+						>
+							Headers
+						</TabsTrigger>
+
+						<TabsTrigger
+							className="cursor-pointer whitespace-nowrap"
+							value="queryParams"
+						>
+							Query Params
+						</TabsTrigger>
+
+						<TabsTrigger
+							className="cursor-pointer whitespace-nowrap"
+							value="pathParams"
+						>
+							Path Params
+						</TabsTrigger>
+
+						<TabsTrigger
+							className="cursor-pointer whitespace-nowrap"
+							value="requestBody"
+						>
+							Request Body
+						</TabsTrigger>
+
+						<TabsTrigger className="cursor-pointer whitespace-nowrap" value="responses">
+							Responses
+						</TabsTrigger>
+
+						<TabsTrigger className="cursor-pointer whitespace-nowrap" value="notes">
+							Notes
+						</TabsTrigger>
+					</TabsList>
+				</div>
+
+				<TabsContent value="headerParams" className="mt-0">
+					<TabScrollContainer>
+						<ParametersTabContent
+							parameters={headerParams}
+							openApiSpec={openApiSpec}
+							paramTypeLabel="Headers"
+						/>
+					</TabScrollContainer>
+				</TabsContent>
+
+				<TabsContent value="queryParams" className="mt-0">
+					<TabScrollContainer>
+						<ParametersTabContent
+							parameters={queryParams}
+							openApiSpec={openApiSpec}
+							paramTypeLabel="Query Params"
+						/>
+					</TabScrollContainer>
+				</TabsContent>
+
+				<TabsContent value="pathParams" className="mt-0">
+					<TabScrollContainer>
+						<ParametersTabContent
+							parameters={pathParams}
+							openApiSpec={openApiSpec}
+							paramTypeLabel="Path Params"
+						/>
+					</TabScrollContainer>
+				</TabsContent>
+
+				<TabsContent value="requestBody" className="mt-0">
+					<TabScrollContainer>
+						<RequestBodyTabContent
+							requestBody={resolvedRequestBody}
+							openApiSpec={openApiSpec}
+						/>
+					</TabScrollContainer>
+				</TabsContent>
+
+				<TabsContent value="responses" className="mt-0">
+					<TabScrollContainer>
+						<ResponsesTabContent
+							responses={responseObjects}
+							openApiSpec={openApiSpec}
+						/>
+					</TabScrollContainer>
+				</TabsContent>
+
+				<TabsContent value="notes" className="mt-0">
+					<TabScrollContainer>
+						<NotesSection projectId={projectId} endpointId={endpointId} />
+					</TabScrollContainer>
+				</TabsContent>
+			</Tabs>
+		</div>
+	);
+};
