@@ -1,6 +1,5 @@
-
-import { useState, useEffect } from 'react';
-import { Progress } from '@/components/ui/progress';
+import { Progress } from '@/shared/ui/progress';
+import { useEffect, useState } from 'react';
 
 function EditorLoading() {
 	const [progress, setProgress] = useState(13);
@@ -8,7 +7,7 @@ function EditorLoading() {
 	useEffect(() => {
 		const timer1 = setTimeout(() => setProgress(66), 400);
 		const timer2 = setTimeout(() => setProgress(88), 900);
-		
+
 		return () => {
 			clearTimeout(timer1);
 			clearTimeout(timer2);

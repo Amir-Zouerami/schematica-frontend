@@ -1,11 +1,24 @@
-import React, { useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useAuth } from '@/app/providers/AuthContext';
+import { useMe } from '@/entities/User/api/useMe';
+import { useSetPassword } from '@/entities/User/api/useUsers';
+import { ApiError } from '@/shared/api/api';
+import { zodResolver } from '@hookform/resolvers/zod';
+import React, { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/AuthContext';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { z } from 'zod';
+
+import { Button } from '@/shared/ui/button';
+import {
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from '@/shared/ui/dialog';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/shared/ui/form';
+import { Input } from '@/shared/ui/input';
 
 interface ChangePasswordModalProps {
 	isOpen: boolean;
@@ -13,151 +26,206 @@ interface ChangePasswordModalProps {
 	redirectTo?: string;
 }
 
-const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({ isOpen, onClose, redirectTo = '/login' }) => {
-	const { changePassword, logout } = useAuth();
-	const { toast } = useToast();
+const getFormSchema = (mode: 'change' | 'set') => {
+	let schema = z
+		.object({
+			currentPassword: z.string().optional(),
+			newPassword: z
+				.string()
+				.min(8, { message: 'New password must be at least 8 characters long.' }),
+			confirmPassword: z.string(),
+		})
+		.refine((data) => data.newPassword === data.confirmPassword, {
+			message: 'New passwords do not match.',
+			path: ['confirmPassword'],
+		});
+
+	if (mode === 'change') {
+		schema = schema
+			.refine((data) => data.currentPassword && data.currentPassword.length > 0, {
+				message: 'Current password is required.',
+				path: ['currentPassword'],
+			})
+			.refine((data) => data.currentPassword !== data.newPassword, {
+				message: 'New password cannot be the same as the current password.',
+				path: ['newPassword'],
+			});
+	}
+
+	return schema;
+};
+
+const ChangePasswordModal: React.FC<ChangePasswordModalProps> = ({
+	isOpen,
+	onClose,
+	redirectTo = '/login',
+}) => {
 	const navigate = useNavigate();
+	const { data: user } = useMe();
+	const { changePassword, logout } = useAuth();
+	const setPasswordMutation = useSetPassword();
 
-	const [currentPassword, setCurrentPassword] = useState('');
-	const [newPassword, setNewPassword] = useState('');
-	const [confirmPassword, setConfirmPassword] = useState('');
-	const [isLoading, setIsLoading] = useState(false);
+	const [formMode, setFormMode] = useState<'change' | 'set'>('change');
 
-	const resetForm = () => {
-		setCurrentPassword('');
-		setNewPassword('');
-		setConfirmPassword('');
-		setIsLoading(false);
-	};
+	const formSchema = getFormSchema(formMode);
+	type FormValues = z.infer<typeof formSchema>;
 
-	const handleModalClose = () => {
-		if (!isLoading) {
-			resetForm();
-			onClose();
+	const form = useForm<FormValues>({
+		resolver: zodResolver(formSchema),
+		defaultValues: {
+			currentPassword: '',
+			newPassword: '',
+			confirmPassword: '',
+		},
+	});
+
+	const { isSubmitting } = form.formState;
+
+	useEffect(() => {
+		if (isOpen) {
+			form.reset();
+			if (user?.hasPassword === false) {
+				setFormMode('set');
+			} else {
+				setFormMode('change');
+			}
 		}
-	};
+	}, [isOpen, user, form]);
 
-	const handleSubmit = async (e: React.FormEvent) => {
-		e.preventDefault();
+	const onSubmit = async (values: FormValues) => {
+		if (formMode === 'change') {
+			try {
+				await changePassword(values.currentPassword!, values.newPassword);
+				onClose();
 
-		if (newPassword !== confirmPassword) {
-			toast({
-				title: 'Validation Error',
-				description: 'New passwords do not match.',
-				variant: 'destructive',
-			});
-			return;
-		}
+				logout({
+					title: 'Password Changed Successfully',
+					description: 'Your password has been updated. Please log in again.',
+				});
 
-		if (newPassword.length < 8) {
-			toast({
-				title: 'Validation Error',
-				description: 'New password must be at least 8 characters long.',
-				variant: 'destructive',
-			});
-			return;
-		}
+				navigate(redirectTo, { replace: true });
+			} catch (err) {
+				const errorMessage =
+					err instanceof ApiError ? err.message : 'An unexpected error occurred.';
+				form.setError('currentPassword', { type: 'server', message: errorMessage });
+			}
+		} else {
+			try {
+				await setPasswordMutation.mutateAsync({ newPassword: values.newPassword });
+				onClose();
 
-		if (currentPassword === newPassword) {
-			toast({
-				title: 'Validation Error',
-				description: 'New password cannot be the same as the current password.',
-				variant: 'destructive',
-			});
-			return;
-		}
+				logout({
+					title: 'Password Set Successfully',
+					description: 'Your password has been set. Please log in again.',
+				});
 
-		setIsLoading(true);
-		try {
-			await changePassword(currentPassword, newPassword);
-
-			toast({
-				title: 'Password Changed Successfully',
-				description: 'Your password has been updated. You will now be logged out.',
-				variant: 'default',
-				duration: 3000,
-			});
-
-			await logout();
-			onClose();
-			navigate(redirectTo, { replace: true });
-
-			resetForm();
-		}
-		catch (error: any) {
-			toast({
-				title: 'Change Password Failed',
-				description: error?.message || 'An unexpected error occurred. Please try again.',
-				variant: 'destructive',
-			});
-		}
-		finally {
-			setIsLoading(false);
+				navigate(redirectTo, { replace: true });
+			} catch (err) {
+				const errorMessage =
+					err instanceof ApiError ? err.message : 'An unexpected error occurred.';
+				form.setError('root.serverError', { message: errorMessage });
+			}
 		}
 	};
 
 	return (
-		<Dialog
-			open={isOpen}
-			onOpenChange={open => {
-				if (!open) {
-					handleModalClose();
-				}
-			}}
-		>
-			<DialogContent className="sm:max-w-md max-w-4xl">
+		<Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+			<DialogContent className="sm:max-w-md">
 				<DialogHeader>
-					<DialogTitle>Change Password</DialogTitle>
+					<DialogTitle>
+						{formMode === 'change' ? 'Change Password' : 'Set Password'}
+					</DialogTitle>
+
 					<DialogDescription>
-						Enter your current password and choose a new password. The new password must be at least 8 characters long.
+						{formMode === 'change'
+							? 'Enter your current password and choose a new password.'
+							: 'Choose a password for your account to enable logging in locally.'}
 					</DialogDescription>
 				</DialogHeader>
-				<form onSubmit={handleSubmit} className="space-y-4 pt-2">
-					<div className="space-y-2">
-						<Label htmlFor="currentPassword">Current Password</Label>
-						<Input
-							id="currentPassword"
-							type="password"
-							value={currentPassword}
-							onChange={e => setCurrentPassword(e.target.value)}
-							required
-							disabled={isLoading}
-							autoComplete="current-password"
+
+				<Form {...form}>
+					<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
+						{form.formState.errors.root?.serverError && (
+							<p className="text-sm font-medium text-red-500 dark:text-red-400">
+								{form.formState.errors.root.serverError.message}
+							</p>
+						)}
+
+						{formMode === 'change' && (
+							<FormField
+								control={form.control}
+								name="currentPassword"
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Current Password</FormLabel>
+										<FormControl>
+											<Input
+												type="password"
+												autoComplete="current-password"
+												{...field}
+											/>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+						)}
+
+						<FormField
+							control={form.control}
+							name="newPassword"
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>New Password</FormLabel>
+									<FormControl>
+										<Input
+											type="password"
+											autoComplete="new-password"
+											{...field}
+										/>
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
 						/>
-					</div>
-					<div className="space-y-2">
-						<Label htmlFor="newPassword">New Password</Label>
-						<Input
-							id="newPassword"
-							type="password"
-							value={newPassword}
-							onChange={e => setNewPassword(e.target.value)}
-							required
-							disabled={isLoading}
-							autoComplete="new-password"
+
+						<FormField
+							control={form.control}
+							name="confirmPassword"
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>Confirm New Password</FormLabel>
+									<FormControl>
+										<Input
+											type="password"
+											autoComplete="new-password"
+											{...field}
+										/>
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
 						/>
-					</div>
-					<div className="space-y-2">
-						<Label htmlFor="confirmPassword">Confirm New Password</Label>
-						<Input
-							id="confirmPassword"
-							type="password"
-							value={confirmPassword}
-							onChange={e => setConfirmPassword(e.target.value)}
-							required
-							disabled={isLoading}
-							autoComplete="new-password"
-						/>
-					</div>
-					<DialogFooter className="mt-6">
-						<Button type="button" variant="outline" onClick={handleModalClose} disabled={isLoading}>
-							Cancel
-						</Button>
-						<Button type="submit" disabled={isLoading}>
-							{isLoading ? 'Changing...' : 'Change Password'}
-						</Button>
-					</DialogFooter>
-				</form>
+
+						<DialogFooter className="mt-6">
+							<Button
+								type="button"
+								variant="outline"
+								onClick={onClose}
+								disabled={isSubmitting}
+							>
+								Cancel
+							</Button>
+							<Button type="submit" disabled={isSubmitting}>
+								{isSubmitting
+									? 'Saving...'
+									: formMode === 'change'
+										? 'Change Password'
+										: 'Set Password'}
+							</Button>
+						</DialogFooter>
+					</form>
+				</Form>
 			</DialogContent>
 		</Dialog>
 	);

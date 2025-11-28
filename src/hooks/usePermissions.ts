@@ -1,8 +1,18 @@
-import { useAuth } from '@/contexts/AuthContext';
-import { Project } from '@/types/types';
+import { useMe } from '@/entities/User/api/useMe';
+import type { components } from '@/shared/types/api-types';
+
+type ProjectDetailDto = components['schemas']['ProjectDetailDto'];
+type TeamDto = components['schemas']['TeamDto'];
+type SanitizedUserDto = components['schemas']['SanitizedUserDto'];
+
+interface AccessControlList {
+	owners: { users: SanitizedUserDto[]; teams: TeamDto[] };
+	viewers: { users: SanitizedUserDto[]; teams: TeamDto[] };
+	deniedUsers: SanitizedUserDto[];
+}
 
 export const usePermissions = () => {
-	const { user } = useAuth();
+	const { data: user } = useMe();
 
 	if (!user) {
 		return {
@@ -14,7 +24,7 @@ export const usePermissions = () => {
 
 	const canCreateProject = user.role === 'admin' || user.role === 'member';
 
-	const isProjectOwner = (project: Project | undefined | null): boolean => {
+	const isProjectOwner = (project: ProjectDetailDto | undefined | null): boolean => {
 		if (user.role === 'admin') {
 			return true;
 		}
@@ -23,11 +33,16 @@ export const usePermissions = () => {
 			return false;
 		}
 
-		if (project.access.owners.users.includes(user.id)) {
+		const access = project.access as unknown as AccessControlList;
+		if (access.owners.users.some((ownerUser) => ownerUser.id === user.id)) {
 			return true;
 		}
 
-		if (user.teams?.some(team => project.access?.owners.teams.includes(team))) {
+		if (
+			user.teams?.some((team: TeamDto) =>
+				access.owners.teams.some((ownerTeam) => ownerTeam.id === team.id),
+			)
+		) {
 			return true;
 		}
 
