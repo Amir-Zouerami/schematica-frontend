@@ -50,10 +50,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete }) => {
 			onClick={viewProject}
 		>
 			<CardHeader className="pb-4">
-				<CardTitle
-					className="text-gradient-green text-xl"
-					style={{ unicodeBidi: 'plaintext' }}
-				>
+				<CardTitle className="text-gradient text-xl" style={{ unicodeBidi: 'plaintext' }}>
 					{project.name}
 				</CardTitle>
 

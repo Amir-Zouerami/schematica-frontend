@@ -19,7 +19,7 @@ export const ManageAccess = ({ project, className }: ManageAccessProps) => {
 		<>
 			<Button
 				variant="outline"
-				className={cn(className)}
+				className={cn(className, 'cursor-pointer')}
 				onClick={() => setIsAccessModalOpen(true)}
 			>
 				<Users className="mr-2 h-4 w-4" /> Manage Access

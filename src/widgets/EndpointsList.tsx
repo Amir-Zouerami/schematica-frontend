@@ -167,7 +167,7 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId, e
 								id={endpoint.id}
 								className="border border-border rounded-lg overflow-hidden"
 							>
-								<AccordionTrigger className="px-4 py-2 hover:bg-secondary/30 transition-colors data-[state=open]:border-b">
+								<AccordionTrigger className="px-4 py-2 hover:bg-secondary/30 transition-colors cursor-pointer data-[state=open]:border-b">
 									<div className="flex flex-col items-start gap-2 w-full text-left md:flex-row md:items-center md:gap-4">
 										<Badge
 											className={`uppercase text-white font-bold w-[70px] text-center justify-center shrink-0 ${

@@ -13,6 +13,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from '@/shared/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/shared/ui/tooltip';
 import { Key, LogOut, Shield, UserCircle } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -29,7 +30,14 @@ const AppHeader = () => {
 		navigate('/login', { replace: true });
 	};
 
-	const teamNames = user?.teams?.map((team) => team.name).join(', ') || 'No teams';
+	const teamNamesList = user?.teams?.map((team) => team.name) || [];
+	const maxTeams = 2;
+	const shouldTruncate = teamNamesList.length > maxTeams;
+
+	const displayedTeams = shouldTruncate
+		? `${teamNamesList.slice(0, maxTeams).join(', ')}, +${teamNamesList.length - maxTeams}`
+		: teamNamesList.join(', ') || 'No teams';
+
 	const profileImageUrl = getStorageUrl(user?.profileImage);
 
 	return (
@@ -37,7 +45,7 @@ const AppHeader = () => {
 			<header className="border-b border-border py-4">
 				<div className="container mx-auto px-4 flex justify-between items-center">
 					<Link to="/" className="flex items-center space-x-2">
-						<h1 className="text-gradient-warm-sunset text-xl md:text-2xl font-bold truncate max-w-[200px] md:max-w-none">
+						<h1 className="text-gradient-mint text-xl md:text-2xl font-bold truncate max-w-[200px] md:max-w-none">
 							{import.meta.env.VITE_BRAND_NAME} API Docs
 						</h1>
 					</Link>
@@ -81,11 +89,30 @@ const AppHeader = () => {
 												</AvatarFallback>
 											</Avatar>
 
-											<div className="flex flex-col space-y-1 leading-none">
+											<div className="flex flex-col space-y-1 leading-none overflow-hidden">
 												<p className="font-medium">{user.username}</p>
-												<p className="text-xs text-muted-foreground capitalize">
-													Team: {teamNames}
-												</p>
+												{shouldTruncate ? (
+													<Tooltip>
+														<TooltipTrigger asChild>
+															<p className="text-xs text-muted-foreground capitalize cursor-help truncate">
+																Team: {displayedTeams}
+															</p>
+														</TooltipTrigger>
+														<TooltipContent
+															side="left"
+															align="start"
+															className="max-w-[200px] wrap-break-word"
+														>
+															<p className="text-xs">
+																{teamNamesList.join(', ')}
+															</p>
+														</TooltipContent>
+													</Tooltip>
+												) : (
+													<p className="text-xs text-muted-foreground capitalize truncate">
+														Team: {displayedTeams}
+													</p>
+												)}
 											</div>
 										</div>
 

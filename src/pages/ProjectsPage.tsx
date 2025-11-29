@@ -115,7 +115,7 @@ const ProjectsPage = () => {
 	return (
 		<div className="space-y-6">
 			<div className="flex flex-wrap justify-between items-center gap-2">
-				<h1 className="text-3xl font-bold text-gradient">Projects</h1>
+				<h1 className="text-3xl font-bold text-gradient-pink-sunset">All Projects</h1>
 				{canCreateProject && (
 					<Button onClick={handleCreateProject}>
 						<Plus className="h-4 w-4 mr-2" /> Create Project

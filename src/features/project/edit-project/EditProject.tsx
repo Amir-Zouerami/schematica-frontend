@@ -19,7 +19,7 @@ export const EditProject = ({ project, className }: EditProjectProps) => {
 		<>
 			<Button
 				variant="outline"
-				className={cn(className)}
+				className={cn(className, 'cursor-pointer')}
 				onClick={() => setIsEditProjectModalOpen(true)}
 			>
 				<Edit3 className="mr-2 h-4 w-4" /> Edit Project
