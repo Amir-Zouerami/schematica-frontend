@@ -256,23 +256,21 @@
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
-	width: 10px;
-	height: 10px;
+	width: 8px;
+	height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-	background: hsl(var(--muted));
-	border-radius: 5px;
+	background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-	background: hsl(var(--primary));
-	border-radius: 5px;
-	border: 2px solid hsl(var(--muted));
+	background: hsl(var(--muted-foreground) / 0.3);
+	border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-	background: hsl(var(--primary) / 0.8);
+	background: hsl(var(--muted-foreground) / 0.5);
 }
 
 html {
@@ -295,7 +293,10 @@ h4,
 h5,
 h6,
 td,
-th {
+th,
+li,
+ul,
+ol {
 	unicode-bidi: plaintext;
 }
 
