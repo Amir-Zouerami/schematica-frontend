@@ -39,7 +39,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 	const performLogout = useCallback(() => {
 		localStorage.removeItem('token');
 		setIsAuthenticated(false);
-		queryClient.removeQueries({ queryKey: ME_QUERY_KEY });
+		queryClient.cancelQueries();
+		queryClient.removeQueries();
+
 		if (lockingSocket) {
 			lockingSocket.disconnect();
 			setLockingSocket(null);

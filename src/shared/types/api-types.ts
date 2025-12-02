@@ -634,6 +634,11 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+            /**
+             * Format: date-time
+             * @description Timestamp when the user was soft-deleted, or null if active.
+             */
+            deletedAt: string | null;
             /** @description Indicates whether the user has a password set (i.e., can use local login). Is `false` for users created via OAuth who have not set a password yet. */
             hasPassword: boolean;
         };
@@ -660,9 +665,17 @@ export interface components {
             lastPage: number;
         };
         SanitizedUserDto: {
+            /** @example clq3... */
             id: string;
+            /** @example amir.zouerami */
             username: string;
+            /** @example /uploads/avatars/1.png */
             profileImage: string | null;
+            /**
+             * @description Indicates if the user has been soft-deleted. Deleted users should be displayed with a visual indicator.
+             * @example false
+             */
+            isDeleted: boolean;
         };
         Object: Record<string, never>;
         ChangePasswordDto: {
@@ -1168,6 +1181,11 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+            /**
+             * Format: date-time
+             * @description Timestamp when the user was soft-deleted, or null if active.
+             */
+            deletedAt: string | null;
         };
         /** @enum {string} */
         Role: "admin" | "member" | "guest";

@@ -1,7 +1,4 @@
-import { ChevronsUpDown, Loader2, Users as TeamsIcon } from 'lucide-react';
-import React, { useEffect, useMemo, useState } from 'react';
-
-import { useSearchableList } from '@/shared/lib/hooks/useSearchableList';
+import { cn } from '@/shared/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/ui/avatar';
 import { Button } from '@/shared/ui/button';
 import {
@@ -13,11 +10,16 @@ import {
 	CommandList,
 } from '@/shared/ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/ui/popover';
+import { ChevronsUpDown, Loader2, Users as TeamsIcon } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+
+import { useSearchableList } from '@/shared/lib/hooks/useSearchableList';
 
 export type SelectableItem = {
 	id: string;
 	name: string;
 	image?: string | null;
+	isDeleted?: boolean;
 };
 
 interface UserTeamSelectorProps {
@@ -44,7 +46,6 @@ const UserTeamSelector: React.FC<UserTeamSelectorProps> = ({
 		return () => clearTimeout(handler);
 	}, [searchTerm]);
 
-	// Define minimum search length
 	const MIN_SEARCH_LENGTH = 2;
 	const isSearchLengthValid =
 		debouncedSearchTerm.length >= MIN_SEARCH_LENGTH || debouncedSearchTerm.length === 0;
@@ -58,6 +59,7 @@ const UserTeamSelector: React.FC<UserTeamSelectorProps> = ({
 				id: item.id,
 				name: 'username' in item ? item.username : item.name,
 				image: 'profileImage' in item ? item.profileImage : null,
+				isDeleted: 'isDeleted' in item ? item.isDeleted : false,
 			}))
 			.filter((item) => !disabledIds.includes(item.id));
 	}, [data, disabledIds]);
@@ -101,15 +103,26 @@ const UserTeamSelector: React.FC<UserTeamSelectorProps> = ({
 									<CommandItem
 										key={item.id}
 										value={item.name}
+										disabled={item.isDeleted}
 										onSelect={() => {
-											onSelect(item);
-											setSearchTerm('');
-											setOpen(false);
+											if (!item.isDeleted) {
+												onSelect(item);
+												setSearchTerm('');
+												setOpen(false);
+											}
 										}}
-										className="flex items-center gap-2 cursor-pointer"
+										className={cn(
+											'flex items-center gap-2 cursor-pointer',
+											item.isDeleted && 'opacity-50 cursor-not-allowed',
+										)}
 									>
 										{type === 'user' ? (
-											<Avatar className="h-6 w-6">
+											<Avatar
+												className={cn(
+													'h-6 w-6',
+													item.isDeleted && 'grayscale',
+												)}
+											>
 												<AvatarImage src={item.image || undefined} />
 												<AvatarFallback className="text-xs">
 													{item.name.substring(0, 2).toUpperCase()}
@@ -118,7 +131,21 @@ const UserTeamSelector: React.FC<UserTeamSelectorProps> = ({
 										) : (
 											<TeamsIcon className="h-4 w-4 text-muted-foreground" />
 										)}
-										<span className="truncate">{item.name}</span>
+										<div className="flex flex-col min-w-0">
+											<span
+												className={cn(
+													'truncate',
+													item.isDeleted && 'line-through',
+												)}
+											>
+												{item.name}
+											</span>
+											{item.isDeleted && (
+												<span className="text-[10px] text-destructive">
+													Deactivated
+												</span>
+											)}
+										</div>
 									</CommandItem>
 								))}
 							</CommandGroup>

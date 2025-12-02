@@ -92,7 +92,12 @@ export const EndpointDetailHeader: React.FC<EndpointDetailHeaderProps> = ({
 
 			<div className="flex flex-col w-full md:w-auto justify-center items-start space-y-2 sm:space-y-3 shrink-0">
 				<div className="flex items-center space-x-2 text-sm text-muted-foreground">
-					<Avatar className="h-6 w-6">
+					<Avatar
+						className={cn(
+							'h-6 w-6',
+							endpoint.creator.isDeleted && 'grayscale opacity-50',
+						)}
+					>
 						<AvatarImage
 							src={
 								typeof endpoint.creator.profileImage === 'string'
@@ -105,13 +110,27 @@ export const EndpointDetailHeader: React.FC<EndpointDetailHeaderProps> = ({
 					</Avatar>
 
 					<span className="text-xs">
-						Added by {createdBy} on {createdAt}
+						Added by{' '}
+						<span
+							className={cn(
+								endpoint.creator.isDeleted &&
+									'line-through decoration-muted-foreground/50',
+							)}
+						>
+							{createdBy}
+						</span>{' '}
+						on {createdAt}
 					</span>
 				</div>
 
 				{lastEditedBy && lastEditedAt && (
 					<div className="flex items-center space-x-2 text-sm text-muted-foreground">
-						<Avatar className="h-6 w-6">
+						<Avatar
+							className={cn(
+								'h-6 w-6',
+								endpoint.updatedBy.isDeleted && 'grayscale opacity-50',
+							)}
+						>
 							<AvatarImage
 								src={
 									typeof endpoint.updatedBy.profileImage === 'string'
@@ -126,7 +145,16 @@ export const EndpointDetailHeader: React.FC<EndpointDetailHeaderProps> = ({
 						</Avatar>
 
 						<span className="text-xs">
-							Last edited by {lastEditedBy} on {lastEditedAt}
+							Last edited by{' '}
+							<span
+								className={cn(
+									endpoint.updatedBy.isDeleted &&
+										'line-through decoration-muted-foreground/50',
+								)}
+							>
+								{lastEditedBy}
+							</span>{' '}
+							on {lastEditedAt}
 						</span>
 					</div>
 				)}

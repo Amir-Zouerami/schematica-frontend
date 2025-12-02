@@ -1,4 +1,5 @@
 import UserTeamSelector, { type SelectableItem } from '@/components/projects/UserTeamSelector';
+import { cn } from '@/shared/lib/utils';
 import type { components } from '@/shared/types/api-types';
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/ui/avatar';
 import { Button } from '@/shared/ui/button';
@@ -68,14 +69,34 @@ export const AccessListCard: React.FC<AccessListCardProps> = ({
 								{users.map((user) => (
 									<TableRow key={`user-${user.id}`}>
 										<TableCell className="flex items-center gap-2 py-2 whitespace-nowrap">
-											<Avatar className="h-6 w-6">
+											<Avatar
+												className={cn(
+													'h-6 w-6',
+													user.isDeleted && 'grayscale opacity-50',
+												)}
+											>
 												<AvatarImage src={user.profileImage || undefined} />
 												<AvatarFallback className="text-xs">
 													{user.username.substring(0, 2).toUpperCase()}
 												</AvatarFallback>
 											</Avatar>
 
-											<span className="text-sm">{user.username}</span>
+											<div className="flex flex-col leading-none">
+												<span
+													className={cn(
+														'text-sm',
+														user.isDeleted &&
+															'text-muted-foreground line-through decoration-muted-foreground/50',
+													)}
+												>
+													{user.username}
+												</span>
+												{user.isDeleted && (
+													<span className="text-[9px] text-muted-foreground uppercase font-semibold">
+														Deactivated
+													</span>
+												)}
+											</div>
 										</TableCell>
 
 										<TableCell className="text-right py-2">
@@ -84,6 +105,7 @@ export const AccessListCard: React.FC<AccessListCardProps> = ({
 												size="sm"
 												className="h-6 w-6 p-0"
 												onClick={() => onRemoveUser(user.id)}
+												title="Remove user"
 											>
 												<X className="h-3 w-3" />
 											</Button>
@@ -105,6 +127,7 @@ export const AccessListCard: React.FC<AccessListCardProps> = ({
 													size="sm"
 													className="h-6 w-6 p-0"
 													onClick={() => onRemoveTeam(team.id)}
+													title="Remove team"
 												>
 													<X className="h-3 w-3" />
 												</Button>

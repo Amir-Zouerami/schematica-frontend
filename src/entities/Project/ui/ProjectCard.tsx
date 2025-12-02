@@ -1,4 +1,6 @@
 import { useMe } from '@/entities/User/api/useMe';
+import MarkdownRenderer from '@/features/endpoint/edit-endpoint/ui/MarkdownRenderer';
+import { cn } from '@/shared/lib/utils';
 import type { components } from '@/shared/types/api-types';
 import {
 	AlertDialog,
@@ -55,25 +57,37 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete }) => {
 				</CardTitle>
 
 				<CardDescription className="text-muted-foreground text-sm">
-					<div className="text-xs mb-1 mt-1">
+					<div className="text-xs mb-1 mt-1 flex flex-wrap gap-1">
 						<span>Updated: </span>
 						{formatDistanceToNow(new Date(project.updatedAt), {
 							addSuffix: true,
 						})}{' '}
-						by {project.updatedBy.username}
+						by
+						<span
+							className={cn(
+								project.updatedBy.isDeleted &&
+									'text-muted-foreground line-through decoration-muted-foreground/50',
+							)}
+						>
+							{project.updatedBy.username}
+						</span>
 					</div>
 				</CardDescription>
 			</CardHeader>
 
 			<CardContent className="grow space-y-4">
-				<p
-					className="text-sm line-clamp-3 text-muted-foreground"
-					style={{ unicodeBidi: 'plaintext' }}
-				>
-					{typeof project.description === 'string' && project.description
-						? project.description
-						: 'No description provided.'}
-				</p>
+				<div className="min-h-10">
+					{typeof project.description === 'string' && project.description ? (
+						<MarkdownRenderer
+							content={project.description}
+							className="line-clamp-3 text-sm [&>p]:m-0 [&>p]:inline [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_ul]:my-0 [&_ol]:my-0"
+						/>
+					) : (
+						<p className="text-sm line-clamp-3 text-muted-foreground">
+							No description provided.
+						</p>
+					)}
+				</div>
 
 				{project.servers && project.servers.length > 0 && (
 					<div className="text-xs bg-secondary/30 rounded p-2 font-mono overflow-hidden">
@@ -86,7 +100,15 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, onDelete }) => {
 
 			<CardFooter className="pt-2 flex justify-between items-center">
 				<div className="text-xs text-muted-foreground">
-					Created by {project.creator.username}
+					Created by{' '}
+					<span
+						className={cn(
+							project.creator.isDeleted &&
+								'text-muted-foreground line-through decoration-muted-foreground/50',
+						)}
+					>
+						{project.creator.username}
+					</span>
 				</div>
 
 				<div className="flex space-x-2">

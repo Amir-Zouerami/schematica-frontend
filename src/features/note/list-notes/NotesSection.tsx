@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
 import { formatDate } from '@/shared/lib/schemaUtils';
 import { getStorageUrl } from '@/shared/lib/storage';
+import { cn } from '@/shared/lib/utils';
 import type { components } from '@/shared/types/api-types';
 
 import MarkdownRenderer from '@/features/endpoint/edit-endpoint/ui/MarkdownRenderer';
@@ -144,7 +145,12 @@ const NotesSection: React.FC<NotesSectionProps> = ({ projectId, endpointId }) =>
 									</div>
 
 									<div className="flex items-center space-x-2 mt-3 text-xs text-muted-foreground">
-										<Avatar className="h-5 w-5">
+										<Avatar
+											className={cn(
+												'h-5 w-5',
+												note.author.isDeleted && 'grayscale opacity-50',
+											)}
+										>
 											<AvatarImage
 												src={getStorageUrl(note.author.profileImage)}
 											/>
@@ -155,7 +161,15 @@ const NotesSection: React.FC<NotesSectionProps> = ({ projectId, endpointId }) =>
 										</Avatar>
 
 										<span>
-											{note.author.username} • {formatDate(note.createdAt)}
+											<span
+												className={cn(
+													note.author.isDeleted &&
+														'line-through decoration-muted-foreground/50',
+												)}
+											>
+												{note.author.username}
+											</span>{' '}
+											• {formatDate(note.createdAt)}
 										</span>
 									</div>
 								</div>

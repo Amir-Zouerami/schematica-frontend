@@ -33,11 +33,25 @@ const DeleteUser: React.FC<DeleteUserProps> = ({ user }) => {
 	const confirmDelete = async () => {
 		try {
 			await deleteUserMutation.mutateAsync(user.id);
-			toast({ title: 'Success', description: 'User deleted successfully.' });
+			toast({ title: 'Success', description: 'User deactivated successfully.' });
 			setIsOpen(false);
 		} catch (err) {
-			const errorMessage = err instanceof ApiError ? err.message : 'Failed to delete user.';
-			toast({ title: 'Error', description: errorMessage, variant: 'destructive' });
+			const error = err as ApiError;
+			let title = 'Error';
+			let description = 'Failed to deactivate user.';
+
+			if (error.status === 404) {
+				title = 'Already Deactivated';
+				description = 'This user has already been deactivated.';
+				setIsOpen(false);
+			} else if (error.status === 403) {
+				title = 'Action Forbidden';
+				description = 'You cannot deactivate the Root Admin or your own account.';
+			} else {
+				description = error.message;
+			}
+
+			toast({ title, description, variant: 'destructive' });
 		}
 	};
 
@@ -51,11 +65,16 @@ const DeleteUser: React.FC<DeleteUserProps> = ({ user }) => {
 
 			<AlertDialogContent className="max-w-3xl">
 				<AlertDialogHeader>
-					<AlertDialogTitle>Are you sure?</AlertDialogTitle>
+					<AlertDialogTitle>Deactivate User?</AlertDialogTitle>
 				</AlertDialogHeader>
 
 				<AlertDialogDescription className="py-1 leading-6">
-					This will permanently delete the user "{user.username}". This cannot be undone.
+					Are you sure you want to deactivate "{user.username}"?
+					<br />
+					<span className="mt-2 block text-xs text-muted-foreground">
+						This will immediately revoke their access and invalidate their sessions.
+						Historical data (like notes and audits) will be preserved.
+					</span>
 				</AlertDialogDescription>
 
 				<AlertDialogFooter>
@@ -65,7 +84,7 @@ const DeleteUser: React.FC<DeleteUserProps> = ({ user }) => {
 						disabled={deleteUserMutation.isPending}
 						className={cn(buttonVariants({ variant: 'destructive' }))}
 					>
-						{deleteUserMutation.isPending ? 'Deleting...' : 'Delete'}
+						{deleteUserMutation.isPending ? 'Deactivating...' : 'Deactivate'}
 					</AlertDialogAction>
 				</AlertDialogFooter>
 			</AlertDialogContent>

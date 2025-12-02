@@ -2,6 +2,7 @@ import { AuditLogFilters, useAuditLogs } from '@/entities/AuditLog/api/useAuditL
 import { auditActions } from '@/entities/AuditLog/data/auditActions';
 import { ApiError } from '@/shared/api/api';
 import { formatDate } from '@/shared/lib/schemaUtils';
+import { cn } from '@/shared/lib/utils';
 import type { components } from '@/shared/types/api-types';
 import { ScrollArea, ScrollBar } from '@/shared/ui/scroll-area';
 import { useEffect, useState } from 'react';
@@ -137,7 +138,13 @@ const AuditTrail = () => {
 									allLogs.map((log) => (
 										<TableRow key={log.id}>
 											<TableCell className="font-medium flex items-center gap-2">
-												<Avatar className="h-8 w-8">
+												<Avatar
+													className={cn(
+														'h-8 w-8',
+														log.actor?.isDeleted &&
+															'grayscale opacity-50',
+													)}
+												>
 													<AvatarImage
 														src={
 															typeof log.actor?.profileImage ===
@@ -154,7 +161,14 @@ const AuditTrail = () => {
 															.toUpperCase() || 'SYS'}
 													</AvatarFallback>
 												</Avatar>
-												{log.actor?.username || 'System'}
+												<span
+													className={cn(
+														log.actor?.isDeleted &&
+															'text-muted-foreground line-through decoration-muted-foreground/50',
+													)}
+												>
+													{log.actor?.username || 'System'}
+												</span>
 											</TableCell>
 
 											<TableCell>

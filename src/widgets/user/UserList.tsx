@@ -1,12 +1,14 @@
 import { useAdminUsers } from '@/entities/User/api/useUsersAdmin';
 import type { components } from '@/shared/types/api-types';
-import { Search } from 'lucide-react';
+import { Ban, Search } from 'lucide-react';
 import React, { useEffect, useState } from 'react';
 
 import DeleteUser from '@/features/user/delete-user/DeleteUser';
 import EditUser from '@/features/user/edit-user/EditUser';
+import { cn } from '@/shared/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/ui/avatar';
 import { Badge } from '@/shared/ui/badge';
+import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import {
 	Pagination,
@@ -88,9 +90,17 @@ const UserList = () => {
 							</TableRow>
 						) : (
 							users.map((user) => (
-								<TableRow key={user.id}>
-									<TableCell className="font-medium flex items-center gap-2 whitespace-nowrap">
-										<Avatar className="h-8 w-8">
+								<TableRow
+									key={user.id}
+									className={user.deletedAt ? 'bg-muted/30' : ''}
+								>
+									<TableCell className="font-medium flex items-center gap-3 whitespace-nowrap">
+										<Avatar
+											className={cn(
+												'h-8 w-8',
+												user.deletedAt && 'grayscale opacity-50',
+											)}
+										>
 											<AvatarImage
 												src={
 													typeof user.profileImage === 'string'
@@ -104,13 +114,40 @@ const UserList = () => {
 												{user.username.substring(0, 2).toUpperCase()}
 											</AvatarFallback>
 										</Avatar>
-										{user.username}
+										<div className="flex flex-col">
+											<span
+												className={cn(
+													user.deletedAt &&
+														'text-muted-foreground line-through decoration-muted-foreground/50',
+												)}
+											>
+												{user.username}
+											</span>
+											{user.deletedAt && (
+												<span className="text-[10px] text-destructive font-medium uppercase tracking-wider">
+													Deactivated
+												</span>
+											)}
+										</div>
 									</TableCell>
 
-									<TableCell className="capitalize">{user.role}</TableCell>
+									<TableCell className="capitalize">
+										<span
+											className={
+												user.deletedAt ? 'text-muted-foreground' : ''
+											}
+										>
+											{user.role}
+										</span>
+									</TableCell>
 
 									<TableCell>
-										<div className="flex flex-wrap gap-1 min-w-[100px]">
+										<div
+											className={cn(
+												'flex flex-wrap gap-1 min-w-[100px]',
+												user.deletedAt && 'opacity-50',
+											)}
+										>
 											{user.teams?.map((team: TeamDto) => (
 												<Badge key={team.id} variant="outline">
 													{team.name}
@@ -120,8 +157,21 @@ const UserList = () => {
 									</TableCell>
 
 									<TableCell className="text-right whitespace-nowrap">
-										<EditUser user={user} />
-										<DeleteUser user={user} />
+										{user.deletedAt ? (
+											<Button
+												variant="ghost"
+												size="sm"
+												disabled
+												className="text-muted-foreground cursor-not-allowed opacity-50"
+											>
+												<Ban className="h-4 w-4 mr-1" /> Deactivated
+											</Button>
+										) : (
+											<div className="flex justify-end gap-1">
+												<EditUser user={user} />
+												<DeleteUser user={user} />
+											</div>
+										)}
 									</TableCell>
 								</TableRow>
 							))

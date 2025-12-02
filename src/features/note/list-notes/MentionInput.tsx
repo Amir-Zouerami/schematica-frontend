@@ -1,4 +1,5 @@
 import { useSearchableList } from '@/shared/lib/hooks/useSearchableList';
+import { cn } from '@/shared/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/ui/avatar';
 import { Button } from '@/shared/ui/button';
 import {
@@ -90,6 +91,8 @@ export const MentionInput: React.FC<MentionInputProps> = ({
 		if (showSuggestions && e.key === 'Enter' && users && users.length > 0) {
 			e.preventDefault();
 			const user = users[0];
+			if ('isDeleted' in user && user.isDeleted) return;
+
 			const username = 'username' in user ? user.username : user.name;
 			insertMention(username);
 		}
@@ -134,7 +137,6 @@ export const MentionInput: React.FC<MentionInputProps> = ({
 							/>
 						</PopoverTrigger>
 
-						{/* Only render content if suggestions are explicitly shown */}
 						<PopoverContent
 							className="p-0 w-[250px]"
 							onOpenAutoFocus={(e) => e.preventDefault()}
@@ -157,52 +159,65 @@ export const MentionInput: React.FC<MentionInputProps> = ({
 										</div>
 									) : users && users.length > 0 ? (
 										<CommandGroup heading="Users">
-											{users.map((user) => (
-												<CommandItem
-													key={user.id}
-													value={
-														'username' in user
-															? user.username
-															: user.name
-													}
-													onSelect={() =>
-														insertMention(
-															'username' in user
-																? user.username
-																: user.name,
-														)
-													}
-													className="cursor-pointer"
-												>
-													<div className="flex items-center gap-2">
-														<Avatar className="h-6 w-6">
-															<AvatarImage
-																src={
-																	'profileImage' in user
-																		? user.profileImage ||
-																			undefined
-																		: undefined
-																}
-															/>
+											{users.map((user) => {
+												const isDeleted =
+													'isDeleted' in user && user.isDeleted;
+												const username =
+													'username' in user ? user.username : user.name;
 
-															<AvatarFallback>
-																{('username' in user
-																	? user.username
-																	: user.name
-																)
-																	.substring(0, 2)
-																	.toUpperCase()}
-															</AvatarFallback>
-														</Avatar>
+												return (
+													<CommandItem
+														key={user.id}
+														value={username}
+														disabled={isDeleted}
+														onSelect={() =>
+															!isDeleted && insertMention(username)
+														}
+														className={cn(
+															'cursor-pointer',
+															isDeleted && 'opacity-50',
+														)}
+													>
+														<div className="flex items-center gap-2 w-full overflow-hidden">
+															<Avatar
+																className={cn(
+																	'h-6 w-6',
+																	isDeleted && 'grayscale',
+																)}
+															>
+																<AvatarImage
+																	src={
+																		'profileImage' in user
+																			? user.profileImage ||
+																				undefined
+																			: undefined
+																	}
+																/>
 
-														<span>
-															{'username' in user
-																? user.username
-																: user.name}
-														</span>
-													</div>
-												</CommandItem>
-											))}
+																<AvatarFallback>
+																	{username
+																		.substring(0, 2)
+																		.toUpperCase()}
+																</AvatarFallback>
+															</Avatar>
+
+															<span
+																className={cn(
+																	'truncate',
+																	isDeleted && 'line-through',
+																)}
+															>
+																{username}
+															</span>
+															{isDeleted && (
+																<span className="text-[10px] text-destructive ml-auto">
+																	Deactivated
+																</span>
+															)}
+														</div>
+													</CommandItem>
+												);
+											})}
 										</CommandGroup>
 									) : (
 										<CommandEmpty>No users found.</CommandEmpty>

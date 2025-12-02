@@ -67,7 +67,12 @@ const NotificationItem: React.FC<{
 			)}
 
 			<div className="flex items-start gap-4">
-				<Avatar className="h-9 w-9 border border-border/50 shadow-sm shrink-0 mt-0.5">
+				<Avatar
+					className={cn(
+						'h-9 w-9 border border-border/50 shadow-sm shrink-0 mt-0.5',
+						notification.actor?.isDeleted && 'grayscale opacity-50',
+					)}
+				>
 					<AvatarImage
 						src={getStorageUrl(notification.actor?.profileImage)}
 						alt={actorName}
@@ -81,7 +86,15 @@ const NotificationItem: React.FC<{
 
 				<div className="flex-1 space-y-1">
 					<p className="text-sm leading-snug text-foreground/90 group-hover:text-foreground transition-colors">
-						<span className="font-semibold text-foreground">{actorName}</span>{' '}
+						<span
+							className={cn(
+								'font-semibold text-foreground',
+								notification.actor?.isDeleted &&
+									'text-muted-foreground line-through decoration-muted-foreground/50',
+							)}
+						>
+							{actorName}
+						</span>{' '}
 						<span
 							className="text-muted-foreground"
 							dangerouslySetInnerHTML={{
