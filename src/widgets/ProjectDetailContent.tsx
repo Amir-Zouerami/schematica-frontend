@@ -148,7 +148,7 @@ export const ProjectDetailContent = ({
 					</TabsList>
 				</div>
 
-				<TabsContent value="endpoints">
+				<TabsContent value="endpoints" tabIndex={-1}>
 					{isProjectOwner(project) && openApiSpec && (
 						<div className="space-y-6 mb-6">
 							<CurlConverter projectId={projectId} openApiSpec={openApiSpec} />
@@ -169,15 +169,15 @@ export const ProjectDetailContent = ({
 					)}
 				</TabsContent>
 
-				<TabsContent value="schemas">
+				<TabsContent value="schemas" tabIndex={-1}>
 					<SchemaList projectId={projectId} />
 				</TabsContent>
 
-				<TabsContent value="environments">
+				<TabsContent value="environments" tabIndex={-1}>
 					<EnvironmentManager projectId={projectId} />
 				</TabsContent>
 
-				<TabsContent value="changelog">
+				<TabsContent value="changelog" tabIndex={-1}>
 					<ChangelogTabContent projectId={projectId} />
 				</TabsContent>
 			</Tabs>

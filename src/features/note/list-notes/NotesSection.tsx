@@ -123,117 +123,134 @@ const NotesSection: React.FC<NotesSectionProps> = ({ projectId, endpointId }) =>
 	return (
 		<div className="flex flex-col items-center space-y-6 pb-8">
 			{/* Notes List - Constrained Width */}
-			<div className="w-full space-y-4">
-				{notes?.map((note) => (
-					<div
-						key={note.id}
-						className="bg-secondary/20 rounded-lg p-4 border border-border/50 group"
-					>
-						{editingNote?.id === note.id ? (
-							<MentionInput
-								initialContent={note.content}
-								onSubmit={handleSaveEdit}
-								onCancel={() => setEditingNote(null)}
-								isSubmitting={updateNoteMutation.isPending}
-								submitLabel="Save"
-							/>
-						) : (
-							<div className="flex items-start justify-between gap-4">
-								<div className="flex-1 min-w-0">
-									<div className="text-sm">
-										<MarkdownRenderer content={note.content} />
-									</div>
+			<div className="w-full md:w-[90%] space-y-4">
+				{notes?.map((note) => {
+					const isAuthor = user?.id === note.author.id;
+					const canEdit = isAuthor;
+					const canDelete = isAuthor || canWrite;
 
-									<div className="flex items-center space-x-2 mt-3 text-xs text-muted-foreground">
-										<Avatar
-											className={cn(
-												'h-5 w-5',
-												note.author.isDeleted && 'grayscale opacity-50',
-											)}
-										>
-											<AvatarImage
-												src={getStorageUrl(note.author.profileImage)}
-											/>
+					return (
+						<div
+							key={note.id}
+							className="bg-secondary/20 rounded-lg p-4 border border-border/50 group"
+						>
+							{editingNote?.id === note.id ? (
+								<MentionInput
+									initialContent={note.content}
+									onSubmit={handleSaveEdit}
+									onCancel={() => setEditingNote(null)}
+									isSubmitting={updateNoteMutation.isPending}
+									submitLabel="Save"
+								/>
+							) : (
+								<div className="flex items-start justify-between gap-4">
+									<div className="flex-1 min-w-0">
+										<div className="text-sm">
+											<MarkdownRenderer content={note.content} />
+										</div>
 
-											<AvatarFallback>
-												{note.author.username.substring(0, 2).toUpperCase()}
-											</AvatarFallback>
-										</Avatar>
-
-										<span>
-											<span
+										<div className="flex items-center space-x-2 mt-3 text-xs text-muted-foreground">
+											<Avatar
 												className={cn(
-													note.author.isDeleted &&
-														'line-through decoration-muted-foreground/50',
+													'h-5 w-5',
+													note.author.isDeleted && 'grayscale opacity-50',
 												)}
 											>
-												{note.author.username}
-											</span>{' '}
-											• {formatDate(note.createdAt)}
-										</span>
+												<AvatarImage
+													src={getStorageUrl(note.author.profileImage)}
+												/>
+
+												<AvatarFallback>
+													{note.author.username
+														.substring(0, 2)
+														.toUpperCase()}
+												</AvatarFallback>
+											</Avatar>
+
+											<span>
+												<span
+													className={cn(
+														note.author.isDeleted &&
+															'line-through decoration-muted-foreground/50',
+													)}
+												>
+													{note.author.username}
+												</span>{' '}
+												• {formatDate(note.createdAt)}
+											</span>
+										</div>
 									</div>
-								</div>
 
-								{(canWrite || user?.username === note.author.username) && (
-									<div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-										<Button
-											variant="ghost"
-											size="sm"
-											onClick={() => setEditingNote(note)}
-											className="h-8 w-8 p-0 text-blue-400 hover:bg-blue-500/10"
-										>
-											<Edit className="h-3.5 w-3.5" />
-										</Button>
-
-										<AlertDialog>
-											<AlertDialogTrigger asChild>
+									{(canEdit || canDelete) && (
+										<div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity gap-1">
+											{canEdit && (
 												<Button
 													variant="ghost"
 													size="sm"
-													onClick={() => setNoteToDelete(note)}
-													className="h-8 w-8 p-0 text-red-500 hover:bg-red-500/10"
+													onClick={() => setEditingNote(note)}
+													className="h-8 w-8 p-0 text-blue-400 hover:bg-blue-500/10 cursor-pointer"
+													title="Edit Note"
 												>
-													<Trash2 className="h-3.5 w-3.5" />
+													<Edit className="h-3.5 w-3.5" />
 												</Button>
-											</AlertDialogTrigger>
+											)}
 
-											<AlertDialogContent>
-												<AlertDialogHeader>
-													<AlertDialogTitle>
-														Delete Note?
-													</AlertDialogTitle>
+											{canDelete && (
+												<AlertDialog>
+													<AlertDialogTrigger asChild>
+														<Button
+															variant="ghost"
+															size="sm"
+															onClick={() => setNoteToDelete(note)}
+															className="h-8 w-8 p-0 text-red-500 hover:bg-red-500/10 cursor-pointer"
+															title="Delete Note"
+														>
+															<Trash2 className="h-3.5 w-3.5" />
+														</Button>
+													</AlertDialogTrigger>
 
-													<AlertDialogDescription>
-														This cannot be undone.
-													</AlertDialogDescription>
-												</AlertDialogHeader>
+													<AlertDialogContent>
+														<AlertDialogHeader>
+															<AlertDialogTitle>
+																Delete Note?
+															</AlertDialogTitle>
 
-												<AlertDialogFooter>
-													<AlertDialogCancel
-														onClick={() => setNoteToDelete(null)}
-													>
-														Cancel
-													</AlertDialogCancel>
+															<AlertDialogDescription>
+																This cannot be undone.
+															</AlertDialogDescription>
+														</AlertDialogHeader>
 
-													<AlertDialogAction
-														onClick={handleDelete}
-														className="bg-destructive"
-													>
-														Delete
-													</AlertDialogAction>
-												</AlertDialogFooter>
-											</AlertDialogContent>
-										</AlertDialog>
-									</div>
-								)}
-							</div>
-						)}
-					</div>
-				))}
+														<AlertDialogFooter>
+															<AlertDialogCancel
+																onClick={() =>
+																	setNoteToDelete(null)
+																}
+																className="cursor-pointer"
+															>
+																Cancel
+															</AlertDialogCancel>
+
+															<AlertDialogAction
+																onClick={handleDelete}
+																className="bg-destructive cursor-pointer"
+															>
+																Delete
+															</AlertDialogAction>
+														</AlertDialogFooter>
+													</AlertDialogContent>
+												</AlertDialog>
+											)}
+										</div>
+									)}
+								</div>
+							)}
+						</div>
+					);
+				})}
 			</div>
 
 			{canWrite && !editingNote && (
-				<div className="w-full pt-4">
+				<div className="w-full md:w-[90%] pt-4">
 					<MentionInput
 						onSubmit={handleAddNote}
 						isSubmitting={createNoteMutation.isPending}

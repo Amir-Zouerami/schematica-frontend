@@ -34,7 +34,7 @@ const AdminPage = () => {
 					</TabsList>
 				</div>
 
-				<TabsContent value="users">
+				<TabsContent value="users" tabIndex={-1}>
 					<Card>
 						<CardHeader>
 							<CardTitle className="flex justify-between items-center">
@@ -49,7 +49,7 @@ const AdminPage = () => {
 					</Card>
 				</TabsContent>
 
-				<TabsContent value="teams">
+				<TabsContent value="teams" tabIndex={-1}>
 					<Card>
 						<CardHeader>
 							<CardTitle className="flex justify-between items-center">
@@ -64,7 +64,7 @@ const AdminPage = () => {
 					</Card>
 				</TabsContent>
 
-				<TabsContent value="audit">
+				<TabsContent value="audit" tabIndex={-1}>
 					<AuditTrail />
 				</TabsContent>
 			</Tabs>

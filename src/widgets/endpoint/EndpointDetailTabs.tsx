@@ -1,6 +1,8 @@
 import ParametersTabContent from '@/entities/Endpoint/ui/ParametersTabContent';
 import RequestBodyTabContent from '@/entities/Endpoint/ui/RequestBodyTabContent';
 import ResponsesTabContent from '@/entities/Endpoint/ui/ResponsesTabContent';
+import { useNotes } from '@/entities/Note/api/useNotes';
+import { NotesModal } from '@/features/note/list-notes/NotesModal';
 import NotesSection from '@/features/note/list-notes/NotesSection';
 import type {
 	OpenAPISpec,
@@ -8,8 +10,11 @@ import type {
 	ParameterObject,
 	RequestBodyObject,
 } from '@/shared/types/types';
+import { Badge } from '@/shared/ui/badge';
+import { Button } from '@/shared/ui/button';
 import { ScrollArea } from '@/shared/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/shared/ui/tabs';
+import { Maximize2 } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 
 interface EndpointDetailTabsProps {
@@ -17,6 +22,8 @@ interface EndpointDetailTabsProps {
 	endpointId: string;
 	operation: OperationObject;
 	openApiSpec: OpenAPISpec;
+	method: string;
+	path: string;
 }
 
 const TabScrollContainer: React.FC<{ children: React.ReactNode }> = ({ children }) => (
@@ -32,8 +39,14 @@ export const EndpointDetailTabs: React.FC<EndpointDetailTabsProps> = ({
 	endpointId,
 	operation,
 	openApiSpec,
+	method,
+	path,
 }) => {
 	const [activeTab, setActiveTab] = useState('headerParams');
+	const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
+
+	const { data: notes } = useNotes(endpointId);
+	const notesCount = notes?.length || 0;
 
 	const pathParams = useMemo(
 		() =>
@@ -103,13 +116,24 @@ export const EndpointDetailTabs: React.FC<EndpointDetailTabsProps> = ({
 							Responses
 						</TabsTrigger>
 
-						<TabsTrigger className="cursor-pointer whitespace-nowrap" value="notes">
+						<TabsTrigger
+							className="cursor-pointer whitespace-nowrap gap-2"
+							value="notes"
+						>
 							Notes
+							{notesCount > 0 && (
+								<Badge
+									variant="secondary"
+									className="h-5 px-1.5 min-w-5 justify-center text-[10px]"
+								>
+									{notesCount}
+								</Badge>
+							)}
 						</TabsTrigger>
 					</TabsList>
 				</div>
 
-				<TabsContent value="headerParams" className="mt-0">
+				<TabsContent value="headerParams" className="mt-0" tabIndex={-1}>
 					<TabScrollContainer>
 						<ParametersTabContent
 							parameters={headerParams}
@@ -119,7 +143,7 @@ export const EndpointDetailTabs: React.FC<EndpointDetailTabsProps> = ({
 					</TabScrollContainer>
 				</TabsContent>
 
-				<TabsContent value="queryParams" className="mt-0">
+				<TabsContent value="queryParams" className="mt-0" tabIndex={-1}>
 					<TabScrollContainer>
 						<ParametersTabContent
 							parameters={queryParams}
@@ -129,7 +153,7 @@ export const EndpointDetailTabs: React.FC<EndpointDetailTabsProps> = ({
 					</TabScrollContainer>
 				</TabsContent>
 
-				<TabsContent value="pathParams" className="mt-0">
+				<TabsContent value="pathParams" className="mt-0" tabIndex={-1}>
 					<TabScrollContainer>
 						<ParametersTabContent
 							parameters={pathParams}
@@ -139,7 +163,7 @@ export const EndpointDetailTabs: React.FC<EndpointDetailTabsProps> = ({
 					</TabScrollContainer>
 				</TabsContent>
 
-				<TabsContent value="requestBody" className="mt-0">
+				<TabsContent value="requestBody" className="mt-0" tabIndex={-1}>
 					<TabScrollContainer>
 						<RequestBodyTabContent
 							requestBody={resolvedRequestBody}
@@ -148,7 +172,7 @@ export const EndpointDetailTabs: React.FC<EndpointDetailTabsProps> = ({
 					</TabScrollContainer>
 				</TabsContent>
 
-				<TabsContent value="responses" className="mt-0">
+				<TabsContent value="responses" className="mt-0" tabIndex={-1}>
 					<TabScrollContainer>
 						<ResponsesTabContent
 							responses={responseObjects}
@@ -157,12 +181,34 @@ export const EndpointDetailTabs: React.FC<EndpointDetailTabsProps> = ({
 					</TabScrollContainer>
 				</TabsContent>
 
-				<TabsContent value="notes" className="mt-0">
+				<TabsContent value="notes" className="mt-0 relative group" tabIndex={-1}>
+					<Button
+						variant="ghost"
+						size="icon"
+						className="absolute top-2 right-4 z-10 opacity-50 hover:opacity-100 bg-background/50 backdrop-blur-sm cursor-pointer"
+						onClick={() => setIsNotesModalOpen(true)}
+						title="Maximize Notes"
+					>
+						<Maximize2 className="h-4 w-4" />
+					</Button>
 					<TabScrollContainer>
-						<NotesSection projectId={projectId} endpointId={endpointId} />
+						<div className="pt-2">
+							<NotesSection projectId={projectId} endpointId={endpointId} />
+						</div>
 					</TabScrollContainer>
 				</TabsContent>
 			</Tabs>
+
+			{isNotesModalOpen && (
+				<NotesModal
+					isOpen={isNotesModalOpen}
+					onClose={() => setIsNotesModalOpen(false)}
+					projectId={projectId}
+					endpointId={endpointId}
+					endpointMethod={method}
+					endpointPath={path}
+				/>
+			)}
 		</div>
 	);
 };

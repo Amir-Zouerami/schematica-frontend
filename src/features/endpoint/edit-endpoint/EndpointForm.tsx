@@ -120,6 +120,7 @@ const EndpointForm: React.FC<EndpointFormProps> = ({ projectId, endpoint, onClos
 							<TabsContent
 								value="general"
 								className="space-y-8 mt-0 animate-in fade-in-50 duration-300 outline-none"
+								tabIndex={-1}
 							>
 								<div className="grid grid-cols-1 md:grid-cols-12 gap-6">
 									<FormField
@@ -315,6 +316,7 @@ const EndpointForm: React.FC<EndpointFormProps> = ({ projectId, endpoint, onClos
 							<TabsContent
 								value="parameters"
 								className="space-y-8 mt-0 animate-in fade-in-50 duration-300 outline-none"
+								tabIndex={-1}
 							>
 								<FormParametersSection paramType="path" />
 								<div className="border-t border-border/50 my-6" />
@@ -328,6 +330,7 @@ const EndpointForm: React.FC<EndpointFormProps> = ({ projectId, endpoint, onClos
 							<TabsContent
 								value="requestbody"
 								className="mt-0 animate-in fade-in-50 duration-300 outline-none"
+								tabIndex={-1}
 							>
 								<FormRequestBodySection
 									projectId={projectId}
@@ -346,6 +349,7 @@ const EndpointForm: React.FC<EndpointFormProps> = ({ projectId, endpoint, onClos
 							<TabsContent
 								value="responses"
 								className="mt-0 animate-in fade-in-50 duration-300 outline-none"
+								tabIndex={-1}
 							>
 								<FormResponsesSection projectId={projectId} />
 							</TabsContent>

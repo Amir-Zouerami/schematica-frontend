@@ -70,6 +70,8 @@ const EndpointDetail: React.FC<EndpointDetailProps> = ({ endpoint, openApiSpec, 
 				endpointId={endpoint.id}
 				operation={operation}
 				openApiSpec={openApiSpec}
+				method={endpoint.method}
+				path={endpoint.path}
 			/>
 
 			<EndpointDetailFooter

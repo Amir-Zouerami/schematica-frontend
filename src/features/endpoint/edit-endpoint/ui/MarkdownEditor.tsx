@@ -59,7 +59,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				</div>
 
 				<div className="flex-1 relative min-h-[150px] overflow-hidden">
-					<TabsContent value="write" className="mt-0 h-full absolute inset-0">
+					<TabsContent
+						value="write"
+						className="mt-0 h-full absolute inset-0"
+						tabIndex={-1}
+					>
 						<Textarea
 							value={value}
 							onChange={(e) => onChange(e.target.value)}
@@ -74,6 +78,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 						value="preview"
 						className="mt-0 h-full p-4 overflow-y-auto prose prose-sm dark:prose-invert max-w-none bg-secondary/5 whitespace-pre-wrap"
 						dir="auto"
+						tabIndex={-1}
 					>
 						{value ? (
 							<Suspense

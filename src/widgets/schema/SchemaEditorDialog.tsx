@@ -213,7 +213,11 @@ export const SchemaEditorDialog: React.FC<SchemaEditorDialogProps> = ({
 							<TabsTrigger value="editor">JSON Schema</TabsTrigger>
 						</TabsList>
 
-						<TabsContent value="metadata" className="space-y-6 mt-0 flex-1 p-6">
+						<TabsContent
+							value="metadata"
+							className="space-y-6 mt-0 flex-1 p-6"
+							tabIndex={-1}
+						>
 							<div className="space-y-4 max-w-md mx-auto">
 								<div className="space-y-2">
 									<Label>Name</Label>
@@ -252,6 +256,7 @@ export const SchemaEditorDialog: React.FC<SchemaEditorDialogProps> = ({
 						<TabsContent
 							value="editor"
 							className="flex-1 mt-0 relative min-h-[300px] border-t w-full"
+							tabIndex={-1}
 						>
 							<Controller
 								name="schemaString"

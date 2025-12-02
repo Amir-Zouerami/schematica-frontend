@@ -5,6 +5,7 @@ import { useProjectAccess } from '@/features/project/manage-access/hooks/useProj
 import { AccessListCard } from '@/features/project/manage-access/ui/AccessListCard';
 import { useToast } from '@/hooks/use-toast';
 import { api, ApiError } from '@/shared/api/api';
+import { sanitizeUserForApi } from '@/shared/lib/utils';
 import type { components } from '@/shared/types/api-types';
 import { Button } from '@/shared/ui/button';
 import {
@@ -84,11 +85,23 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 			}
 		}
 
+		const sanitizedAccess = {
+			owners: {
+				...access.owners,
+				users: access.owners.users.map(sanitizeUserForApi),
+			},
+			viewers: {
+				...access.viewers,
+				users: access.viewers.users.map(sanitizeUserForApi),
+			},
+			deniedUsers: access.deniedUsers.map(sanitizeUserForApi),
+		};
+
 		try {
 			await updateAccessMutation.mutateAsync({
 				projectId: project.id,
 				accessData: {
-					...access,
+					...sanitizedAccess,
 					lastKnownUpdatedAt: timestampToSubmit,
 				},
 			});
@@ -143,7 +156,6 @@ const ProjectAccessForm: React.FC<ProjectAccessFormProps> = ({ project, isOpen, 
 						</DialogDescription>
 					</DialogHeader>
 
-					{/* ADMIN OVERRIDE BADGE */}
 					{currentUser?.role === 'admin' && (
 						<div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3 flex items-start gap-3 text-sm text-amber-600 dark:text-amber-400 shrink-0">
 							<ShieldAlert className="h-5 w-5 shrink-0 mt-0.5" />
