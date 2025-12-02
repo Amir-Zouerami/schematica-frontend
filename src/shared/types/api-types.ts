@@ -2244,7 +2244,7 @@ export interface operations {
                     "application/json": components["schemas"]["NoteDto"];
                 };
             };
-            /** @description User does not have permission to manage notes in this project. */
+            /** @description User does not have permission to edit this note. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2282,7 +2282,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description User does not have permission to manage notes in this project. */
+            /** @description User does not have permission to delete this note. */
             403: {
                 headers: {
                     [name: string]: unknown;

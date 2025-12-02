@@ -41,7 +41,8 @@ export const responseSchema = z.object({
 	exampleString: jsonString,
 });
 
-const PATH_REGEX = /^(\/([a-zA-Z0-9_\-\.]+|\{[a-zA-Z0-9_]+\}))+$/;
+// CHANGED: Added '@' to the regex character class
+const PATH_REGEX = /^(\/([a-zA-Z0-9_\-\.@]+|\{[a-zA-Z0-9_]+\}))+$/;
 
 export const endpointFormSchema = z.object({
 	path: z
@@ -50,7 +51,7 @@ export const endpointFormSchema = z.object({
 		.startsWith('/', { message: 'Path must start with /' })
 		.regex(PATH_REGEX, {
 			message:
-				'Invalid format. Use "/resource/{param}" syntax. segments cannot be mixed (e.g. "/users{id}" is invalid).',
+				'Invalid format. Use "/resource/{param}" syntax. Segments can contain alphanumeric chars, _, -, ., and @.',
 		}),
 	method: z.enum(['get', 'post', 'put', 'delete', 'patch', 'options', 'head']),
 	status: z.enum(['DRAFT', 'IN_REVIEW', 'PUBLISHED', 'DEPRECATED']),

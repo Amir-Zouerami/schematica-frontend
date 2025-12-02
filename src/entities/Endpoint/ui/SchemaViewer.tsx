@@ -10,8 +10,9 @@ import {
 import { OpenAPISpec, ReferenceObject, SchemaObject } from '@/shared/types/types';
 import { Badge } from '@/shared/ui/badge';
 import { Button } from '@/shared/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/shared/ui/select';
 import SimpleCodeBlock from '@/shared/ui/SimpleCodeBlock';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Split } from 'lucide-react';
 import React, { useMemo, useState } from 'react';
 
 interface SchemaViewerProps {
@@ -41,6 +42,7 @@ const SchemaViewer: React.FC<SchemaViewerProps> = ({
 
 	const [isExpanded, setIsExpanded] = useState(showNestedDetailsInitially);
 	const [isFullSchemaJsonVisible, setIsFullSchemaJsonVisible] = useState(false);
+	const [activeOneOfIndex, setActiveOneOfIndex] = useState(0);
 
 	const fullSchemaJsonForDisplay = useMemo(() => {
 		return JSON.stringify(deeplyResolveReferences(initialSchema, openApiSpec), null, 2);
@@ -92,7 +94,11 @@ const SchemaViewer: React.FC<SchemaViewerProps> = ({
 	const originalRefPath = isRefObject(initialSchema) ? initialSchema.$ref : null;
 	const originalRefName = originalRefPath ? getRefName(originalRefPath) : null;
 
+	const variations = resolvedSchema.oneOf || resolvedSchema.anyOf;
+	const hasVariations = variations && variations.length > 0;
+
 	const hasExpandableContent =
+		hasVariations ||
 		(resolvedSchema.type === 'object' &&
 			resolvedSchema.properties &&
 			Object.keys(resolvedSchema.properties).length > 0) ||
@@ -110,9 +116,18 @@ const SchemaViewer: React.FC<SchemaViewerProps> = ({
 							</span>
 						)}
 
-						<Badge variant="outline" className="text-xs">
-							{typeDisplay}
-						</Badge>
+						{hasVariations ? (
+							<Badge
+								variant="outline"
+								className="text-xs border-blue-500/50 text-blue-500"
+							>
+								oneOf ({variations.length} options)
+							</Badge>
+						) : (
+							<Badge variant="outline" className="text-xs">
+								{typeDisplay}
+							</Badge>
+						)}
 
 						{originalRefName && (
 							<Badge variant="secondary" className="text-xs font-normal">
@@ -160,7 +175,60 @@ const SchemaViewer: React.FC<SchemaViewerProps> = ({
 
 			{isExpanded && (
 				<div className="mt-2">
-					{resolvedSchema.type === 'object' && (
+					{hasVariations && (
+						<div className="bg-secondary/10 rounded-md p-3 border border-border/50 mb-2">
+							<div className="flex items-center gap-2 mb-3">
+								<Split className="h-4 w-4 text-muted-foreground" />
+
+								<span className="text-xs font-medium text-muted-foreground">
+									Select Schema Variation:
+								</span>
+
+								<Select
+									value={activeOneOfIndex.toString()}
+									onValueChange={(v) => setActiveOneOfIndex(parseInt(v))}
+								>
+									<SelectTrigger className="h-7 w-[200px] text-xs">
+										<SelectValue />
+									</SelectTrigger>
+
+									<SelectContent>
+										{variations.map((v, idx) => {
+											const vSchema = v as SchemaObject;
+											let label = vSchema.title;
+
+											if (!label && isRefObject(v)) {
+												label = getRefName((v as ReferenceObject).$ref);
+											}
+
+											if (!label) label = vSchema.type || `Option ${idx + 1}`;
+
+											return (
+												<SelectItem
+													key={idx}
+													value={idx.toString()}
+													className="text-xs"
+												>
+													{label}
+												</SelectItem>
+											);
+										})}
+									</SelectContent>
+								</Select>
+							</div>
+
+							<SchemaViewer
+								schema={variations[activeOneOfIndex]}
+								openApiSpec={openApiSpec}
+								depth={depth}
+								isNested={true}
+								showNestedDetailsInitially={true}
+								showFullJsonButton={false}
+							/>
+						</div>
+					)}
+
+					{!hasVariations && resolvedSchema.type === 'object' && (
 						<SchemaProperties
 							schema={resolvedSchema}
 							openApiSpec={openApiSpec}
@@ -170,7 +238,7 @@ const SchemaViewer: React.FC<SchemaViewerProps> = ({
 						/>
 					)}
 
-					{resolvedSchema.type === 'array' && (
+					{!hasVariations && resolvedSchema.type === 'array' && (
 						<SchemaArrayItems
 							schema={resolvedSchema}
 							openApiSpec={openApiSpec}
@@ -178,6 +246,7 @@ const SchemaViewer: React.FC<SchemaViewerProps> = ({
 							maxDepth={MAX_RECURSION_DEPTH}
 						/>
 					)}
+
 					<SchemaEnumValues schema={resolvedSchema} />
 				</div>
 			)}

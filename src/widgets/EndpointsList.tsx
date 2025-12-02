@@ -2,6 +2,7 @@ import { useEndpoints } from '@/entities/Endpoint/api/useEndpoints';
 import { useProject } from '@/entities/Project/api/useProject';
 import { usePermissions } from '@/hooks/usePermissions';
 import { ApiError } from '@/shared/api/api';
+import { cn } from '@/shared/lib/utils';
 import { OpenAPISpec } from '@/shared/types/types';
 import {
 	Accordion,
@@ -21,6 +22,13 @@ interface EndpointsListProps {
 	projectId: string;
 	endpointId?: string;
 }
+
+// Simple regex to detect Persian/Arabic characters
+const isRtlText = (text?: string) => {
+	if (!text) return false;
+	const rtlRegex = /[\u0600-\u06FF]/;
+	return rtlRegex.test(text);
+};
 
 const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId, endpointId }) => {
 	const { isProjectOwner } = usePermissions();
@@ -96,8 +104,8 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId, e
 	useEffect(() => {
 		if (itemToScrollTo && openAccordionItems.includes(itemToScrollTo)) {
 			const element = document.getElementById(itemToScrollTo);
+
 			if (element) {
-				// Increased timeout to 300ms to allow Accordion animation (200ms) to finish
 				setTimeout(() => {
 					element.scrollIntoView({ behavior: 'smooth', block: 'center' });
 					setItemToScrollTo(null);
@@ -160,55 +168,67 @@ const EndpointsList: React.FC<EndpointsListProps> = ({ openApiSpec, projectId, e
 						value={openAccordionItems}
 						onValueChange={setOpenAccordionItems}
 					>
-						{endpointsInGroup.map((endpoint) => (
-							<AccordionItem
-								key={endpoint.id}
-								value={endpoint.id}
-								id={endpoint.id}
-								className="border border-border rounded-lg overflow-hidden"
-							>
-								<AccordionTrigger className="px-4 py-2 hover:bg-secondary/30 transition-colors cursor-pointer data-[state=open]:border-b">
-									<div className="flex flex-col items-start gap-2 w-full text-left md:flex-row md:items-center md:gap-4">
-										<Badge
-											className={`uppercase text-white font-bold w-[70px] text-center justify-center shrink-0 ${
-												methodColors[endpoint.method] || 'bg-gray-500'
-											}`}
-										>
-											{endpoint.method}
-										</Badge>
+						{endpointsInGroup.map((endpoint) => {
+							const isRtl = isRtlText(endpoint.summary);
 
-										<div className="grow min-w-0 flex flex-col md:flex-row md:items-center gap-1 md:gap-4 w-full md:w-auto">
-											<span className="font-mono font-semibold text-sm truncate">
-												{endpoint.path}
-											</span>
-
-											{endpoint.summary && (
-												<span
-													className="text-xs text-muted-foreground truncate max-w-[300px]"
-													style={{ unicodeBidi: 'plaintext' }}
+							return (
+								<AccordionItem
+									key={endpoint.id}
+									value={endpoint.id}
+									id={endpoint.id}
+									className="border border-border rounded-lg overflow-hidden"
+								>
+									<AccordionTrigger className="px-4 py-2 hover:bg-secondary/30 transition-colors cursor-pointer data-[state=open]:border-b">
+										<div className="flex flex-col md:flex-row w-full items-start md:items-center gap-2 md:gap-4 overflow-hidden">
+											<div className="flex items-center gap-4 min-w-0 shrink-0">
+												<Badge
+													className={`uppercase text-white font-bold w-[70px] text-center justify-center shrink-0 ${
+														methodColors[endpoint.method] ||
+														'bg-gray-500'
+													}`}
 												>
-													{endpoint.summary}
+													{endpoint.method}
+												</Badge>
+
+												<span className="font-mono font-semibold text-sm truncate">
+													{endpoint.path}
 												</span>
-											)}
+											</div>
+
+											<div
+												className={cn(
+													'flex flex-1 items-center gap-3 min-w-0 w-full md:w-auto',
+													isRtl && 'flex-row-reverse text-right',
+												)}
+											>
+												{endpoint.summary && (
+													<span
+														className="text-xs text-muted-foreground truncate"
+														dir="auto"
+													>
+														{endpoint.summary}
+													</span>
+												)}
+
+												{endpoint.status === 'DEPRECATED' && (
+													<Badge variant="outline" className="shrink-0">
+														Deprecated
+													</Badge>
+												)}
+											</div>
 										</div>
+									</AccordionTrigger>
 
-										{endpoint.status === 'DEPRECATED' && (
-											<Badge variant="outline" className="ml-auto shrink-0">
-												Deprecated
-											</Badge>
-										)}
-									</div>
-								</AccordionTrigger>
-
-								<AccordionContent className="p-0">
-									<EndpointDetailLoader
-										projectId={projectId}
-										endpointId={endpoint.id}
-										openApiSpec={openApiSpec}
-									/>
-								</AccordionContent>
-							</AccordionItem>
-						))}
+									<AccordionContent className="p-0">
+										<EndpointDetailLoader
+											projectId={projectId}
+											endpointId={endpoint.id}
+											openApiSpec={openApiSpec}
+										/>
+									</AccordionContent>
+								</AccordionItem>
+							);
+						})}
 					</Accordion>
 				</div>
 			))}

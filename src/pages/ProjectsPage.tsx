@@ -117,7 +117,7 @@ const ProjectsPage = () => {
 			<div className="flex flex-wrap justify-between items-center gap-2">
 				<h1 className="text-3xl font-bold text-gradient-pink-sunset">All Projects</h1>
 				{canCreateProject && (
-					<Button onClick={handleCreateProject}>
+					<Button onClick={handleCreateProject} className="cursor-pointer">
 						<Plus className="h-4 w-4 mr-2" /> Create Project
 					</Button>
 				)}
@@ -142,7 +142,7 @@ const ProjectsPage = () => {
 
 						{canCreateProject && (
 							<EmptyContent>
-								<Button onClick={handleCreateProject}>
+								<Button onClick={handleCreateProject} className="cursor-pointer">
 									<Plus className="h-4 w-4 mr-2" /> Create Project
 								</Button>
 							</EmptyContent>

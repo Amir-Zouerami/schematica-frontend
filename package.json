@@ -1,7 +1,7 @@
 {
 	"name": "schematica-frontend",
 	"private": true,
-	"version": "2.1.1",
+	"version": "2.2.0",
 	"description": "The frontend for Schematica (a collaborative API documentation platform)",
 	"type": "module",
 	"keywords": [

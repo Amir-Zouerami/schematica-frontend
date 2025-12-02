@@ -42,6 +42,13 @@ const STATUS_CONFIG: Record<
 	DEPRECATED: { label: 'Deprecated', color: 'text-red-500 border-red-500/30', icon: FileX },
 };
 
+// Regex to detect Persian/Arabic characters
+const isRtlText = (text?: string) => {
+	if (!text) return false;
+	const rtlRegex = /[\u0600-\u06FF]/;
+	return rtlRegex.test(text);
+};
+
 export const EndpointDetailHeader: React.FC<EndpointDetailHeaderProps> = ({
 	projectId,
 	endpoint,
@@ -63,13 +70,14 @@ export const EndpointDetailHeader: React.FC<EndpointDetailHeaderProps> = ({
 	const currentStatus = STATUS_CONFIG[endpoint.status] || STATUS_CONFIG.DRAFT;
 	const StatusIcon = currentStatus.icon;
 
+	const titleText = operation.summary || `${endpoint.method.toUpperCase()} ${endpoint.path}`;
+	const isRtl = isRtlText(titleText);
+
 	return (
 		<div className="flex flex-col md:flex-row justify-between items-start gap-4 mb-4 mt-3">
 			<div className="flex-1 min-w-0 w-full">
-				<div className="flex items-center gap-4">
-					<h3 className="text-lg font-semibold truncate">
-						{operation.summary || `${endpoint.method.toUpperCase()} ${endpoint.path}`}
-					</h3>
+				<div className={cn('flex items-center gap-4', isRtl && 'flex-row-reverse')}>
+					<h3 className="text-lg font-semibold truncate m-1 my-1">{titleText}</h3>
 
 					<Badge
 						variant="outline"
@@ -84,7 +92,7 @@ export const EndpointDetailHeader: React.FC<EndpointDetailHeaderProps> = ({
 				</div>
 
 				{operation.description && (
-					<div className="mt-2 max-w-[900px]">
+					<div className="mt-2 max-h-[300px] max-w-[1000px] overflow-y-auto pr-1 transition-colors">
 						<MarkdownRenderer content={operation.description} />
 					</div>
 				)}
